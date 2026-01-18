@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
 import { ArrowRight } from 'lucide-react';
@@ -16,12 +16,6 @@ const Home = () => {
 // Hero Section - Beranda
 const HeroSection = () => {
     const [mousePosition, setMousePosition] = useState({ x: 0, y: 0 });
-    const hasAnimated = useRef(false);
-
-    useEffect(() => {
-        // Mark as animated after first render
-        hasAnimated.current = true;
-    }, []);
 
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         const rect = e.currentTarget.getBoundingClientRect();
@@ -30,11 +24,6 @@ const HeroSection = () => {
             y: e.clientY - rect.top
         });
     };
-
-    // Animation only on first visit
-    const fadeInUp = hasAnimated.current
-        ? { opacity: 1, y: 0 }
-        : { opacity: 0, y: 50 };
 
     return (
         <section
@@ -58,7 +47,7 @@ const HeroSection = () => {
                 <div className="max-w-4xl mx-auto text-center">
                     <motion.h1
                         className="mb-6 hero-title"
-                        initial={fadeInUp}
+                        initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                     >
@@ -66,17 +55,17 @@ const HeroSection = () => {
                     </motion.h1>
                     <motion.p
                         className="text-base lg:text-2xl text-[--color-secondary] mb-10 max-w-2xl mx-auto leading-relaxed"
-                        initial={fadeInUp}
+                        initial={{ opacity: 0, y: 50 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
+                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
                     >
                         Relawanns menjadi ruang bagi sesama yang meyakini bahwa setiap kepedulian, sekecil apa pun, dapat menghadirkan perubahan yang berarti.
                     </motion.p>
                     <motion.div
                         className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-                        initial={fadeInUp}
+                        initial={{ opacity: 0, y: 30 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
+                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.4 }}
                     >
                         <Link to="/daftar" className="btn-primary inline-flex items-center justify-center gap-2 w-auto">
                             Daftar Sekarang
