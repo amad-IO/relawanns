@@ -48,7 +48,8 @@ const HeroSection = () => {
                     <motion.h1
                         className="mb-6 hero-title"
                         initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.8, ease: "easeOut" }}
                     >
                         Bergerak Bersama,<br />Bermakna untuk Sesama.
@@ -56,7 +57,8 @@ const HeroSection = () => {
                     <motion.p
                         className="text-base lg:text-2xl text-[--color-secondary] mb-10 max-w-2xl mx-auto leading-relaxed"
                         initial={{ opacity: 0, y: 50 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
                     >
                         Relawanns menjadi ruang bagi sesama yang meyakini bahwa setiap kepedulian, sekecil apa pun, dapat menghadirkan perubahan yang berarti.
@@ -64,7 +66,8 @@ const HeroSection = () => {
                     <motion.div
                         className="flex flex-col sm:flex-row gap-4 justify-center items-center"
                         initial={{ opacity: 0, y: 30 }}
-                        animate={{ opacity: 1, y: 0 }}
+                        whileInView={{ opacity: 1, y: 0 }}
+                        viewport={{ once: true }}
                         transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
                     >
                         <Link to="/daftar" className="btn-primary inline-flex items-center justify-center gap-2 w-auto">
