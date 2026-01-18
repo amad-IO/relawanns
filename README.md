@@ -1,11 +1,44 @@
+# Relawanns - Platform Relawan Indonesia
 
-  # Company Profile Website
+Website untuk pendaftaran relawan Relawanns yang bertujuan untuk mewujudkan perubahan nyata bagi Indonesia melalui berbagai program sosial.
 
-  This is a code bundle for Company Profile Website. The original project is available at https://www.figma.com/design/JikXwtpH1fomyuYtthiWPf/Company-Profile-Website.
+## Fitur
 
-  ## Running the code
+- 🏠 Landing page dengan informasi program
+- 📝 Form pendaftaran relawan online
+- 🖼️ Galeri kegiatan relawan
+- 📱 Responsive design untuk semua perangkat
+- ⚡ Fast & optimized dengan Vite + React
 
-  Run `npm i` to install the dependencies.
+## Tech Stack
 
-  Run `npm run dev` to start the development server.
-  
+- **Frontend:** React 18 + TypeScript
+- **Styling:** Tailwind CSS
+- **Build Tool:** Vite
+- **Backend:** Netlify Functions
+- **Notifications:** Telegram Bot API
+
+## Running the code
+
+Install dependencies:
+```bash
+npm install
+```
+
+Start development server:
+```bash
+npm run dev
+```
+
+Build for production:
+```bash
+npm run build
+```
+
+## Deployment
+
+Project sudah dikonfigurasi untuk deploy di Netlify. Lihat [DEPLOYMENT.md](DEPLOYMENT.md) untuk panduan lengkap.
+
+## License
+
+MIT
