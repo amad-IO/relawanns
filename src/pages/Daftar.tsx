@@ -27,7 +27,7 @@ const EventHeroSection = () => {
                         className="relative rounded-3xl overflow-hidden mb-8 aspect-[16/9]"
                     >
                         <img
-                            src="https://images.unsplash.com/photo-1765018028697-2baae4577cdd?w=1200"
+                            src="/img/21.webp"
                             alt="Event Relawan"
                             className="w-full h-full object-cover"
                         />
