@@ -45,7 +45,7 @@ const EventHeroSection = () => {
                         transition={{ duration: 0.6, delay: 0.2 }}
                     >
                         <h1 className="mb-6 text-black">
-                            Bergabung Bersama Relawanns: Wujudkan Perubahan Nyata untuk Indonesia
+                            Relawanns Mengajar: mengajak adik-adik belajar, bermain, bersama relawanns.
                         </h1>
 
                         {/* Event Meta Info */}
@@ -56,7 +56,7 @@ const EventHeroSection = () => {
                                 </div>
                                 <div>
                                     <div className="text-sm text-[--color-secondary] mb-1">Lokasi</div>
-                                    <div className="font-semibold text-black">Seluruh Indonesia (Hybrid)</div>
+                                    <div className="font-semibold text-black">Surabaya</div>
                                 </div>
                             </div>
 
@@ -65,8 +65,8 @@ const EventHeroSection = () => {
                                     <Calendar size={18} className="text-[--color-primary]" />
                                 </div>
                                 <div>
-                                    <div className="text-sm text-[--color-secondary] mb-1">Pendaftaran Dibuka</div>
-                                    <div className="font-semibold text-black">Sepanjang Tahun 2025</div>
+                                    <div className="text-sm text-[--color-secondary] mb-1">Waktu pelaksanaan</div>
+                                    <div className="font-semibold text-black">Minggu 18 Januari 2025</div>
                                 </div>
                             </div>
                         </div>
@@ -81,7 +81,7 @@ const EventHeroSection = () => {
 const EventDetailsSection = () => {
     const details = [
         {
-            title: 'Detail Program',
+            title: 'Deskripsi Acara',
             content: `Relawanns membuka kesempatan bagi individu yang ingin berkontribusi nyata untuk masyarakat Indonesia. 
       Sebagai relawan, Anda akan terlibat langsung dalam berbagai program sosial seperti pendidikan anak, 
       layanan kesehatan gratis, pelestarian lingkungan, dan tanggap bencana. Kegiatan ini dirancang untuk 
@@ -94,14 +94,7 @@ const EventDetailsSection = () => {
         'Warga Negara Indonesia (WNI) berusia minimal 17 tahun',
         'Memiliki komitmen dan dedikasi tinggi untuk membantu sesama',
         'Mampu bekerja dalam tim dan berkomunikasi dengan baik',
-        'Bersedia mengikuti pelatihan dan orientasi relawan'
-    ];
-
-    const criteria = [
-        'Peduli terhadap isu sosial dan lingkungan',
-        'Adaptif dan mampu bekerja di berbagai kondisi',
-        'Proaktif dan memiliki inisiatif tinggi',
-        'Bertanggung jawab dan dapat dipercaya'
+        'Membayar biaya pendaftaran sebesar Rp. 99.000'
     ];
 
     return (
@@ -137,30 +130,12 @@ const EventDetailsSection = () => {
                                 <h3 className="mb-4">Persyaratan</h3>
                                 <ul className="space-y-3">
                                     {requirements.map((req, index) => (
-                                        <li key={index} className="flex items-start gap-3">
+                                        <li key={index} className="flex items-start gap-3" style={{ color: 'var(--color-secondary)' }}>
                                             <CheckCircle2 size={20} className="text-[--color-primary] flex-shrink-0 mt-0.5" />
-                                            <span className="text-[--color-secondary]">{req}</span>
+                                            <span>{req}</span>
                                         </li>
                                     ))}
                                 </ul>
-                            </motion.div>
-
-                            {/* Criteria */}
-                            <motion.div
-                                initial={{ opacity: 0, y: 20 }}
-                                whileInView={{ opacity: 1, y: 0 }}
-                                viewport={{ once: true }}
-                                transition={{ duration: 0.5, delay: 0.2 }}
-                            >
-                                <h3 className="mb-4">Kriteria Relawan</h3>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    {criteria.map((crit, index) => (
-                                        <div key={index} className="flex items-start gap-3">
-                                            <div className="w-1.5 h-1.5 rounded-full bg-[--color-primary] flex-shrink-0 mt-2" />
-                                            <span className="text-[--color-secondary] text-sm">{crit}</span>
-                                        </div>
-                                    ))}
-                                </div>
                             </motion.div>
                         </div>
 
@@ -179,12 +154,9 @@ const EventDetailsSection = () => {
                                         <Users size={20} className="text-[--color-primary]" />
                                         <h4>Kuota Pendaftaran</h4>
                                     </div>
-                                    <div className="text-3xl font-semibold text-[--color-primary] mb-2">
-                                        Unlimited
+                                    <div className="text-sm font-semibold text-black mb-2">
+                                        25 Relawanns
                                     </div>
-                                    <p className="text-sm text-[--color-secondary]">
-                                        Pendaftaran terbuka sepanjang tahun
-                                    </p>
                                 </div>
 
                                 {/* Category */}
@@ -194,23 +166,9 @@ const EventDetailsSection = () => {
                                         <h4>Kategori</h4>
                                     </div>
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="px-3 py-1.5 bg-white rounded-full text-sm">
-                                            Relawan Sosial
+                                        <span className="text-sm font-semibold text-black mb-2">
+                                            Event
                                         </span>
-                                        <span className="px-3 py-1.5 bg-white rounded-full text-sm">
-                                            Komunitas
-                                        </span>
-                                    </div>
-                                </div>
-
-                                {/* Program Areas */}
-                                <div className="bg-[--color-gray-50] rounded-2xl p-6">
-                                    <h4 className="mb-4">Bidang Program</h4>
-                                    <div className="space-y-2 text-sm text-[--color-secondary]">
-                                        <div>• Pendidikan Anak</div>
-                                        <div>• Kesehatan Masyarakat</div>
-                                        <div>• Pelestarian Lingkungan</div>
-                                        <div>• Tanggap Bencana</div>
                                     </div>
                                 </div>
                             </motion.div>
