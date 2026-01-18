@@ -45,35 +45,17 @@ const HeroSection = () => {
 
             <div className="container-custom relative">
                 <div className="max-w-4xl mx-auto text-center">
-                    <motion.h1
-                        className="mb-6 hero-title"
-                        initial={{ opacity: 0, y: 50 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: "easeOut" }}
-                    >
+                    <h1 className="mb-6 hero-title">
                         Bergerak Bersama,<br />Bermakna untuk Sesama.
-                    </motion.h1>
-                    <motion.p
-                        className="text-base lg:text-2xl text-[--color-secondary] mb-10 max-w-2xl mx-auto leading-relaxed"
-                        initial={{ opacity: 0, y: 50 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.3 }}
-                    >
+                    </h1>
+                    <p className="text-base lg:text-2xl text-[--color-secondary] mb-10 max-w-2xl mx-auto leading-relaxed">
                         Relawanns menjadi ruang bagi sesama yang meyakini bahwa setiap kepedulian, sekecil apa pun, dapat menghadirkan perubahan yang berarti.
-                    </motion.p>
-                    <motion.div
-                        className="flex flex-col sm:flex-row gap-4 justify-center items-center"
-                        initial={{ opacity: 0, y: 30 }}
-                        whileInView={{ opacity: 1, y: 0 }}
-                        viewport={{ once: true }}
-                        transition={{ duration: 0.8, ease: "easeOut", delay: 0.6 }}
-                    >
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
                         <Link to="/daftar" className="btn-primary inline-flex items-center justify-center gap-2 w-auto">
                             Daftar Sekarang
                         </Link>
-                    </motion.div>
+                    </div>
                 </div>
             </div>
         </section>
