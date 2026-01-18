@@ -568,7 +568,7 @@ const Form = () => {
                                 <div>
                                     <h4 className="font-semibold mb-2">Proses Selanjutnya</h4>
                                     <p className="text-sm text-[--color-secondary]">
-                                        Setelah mendaftar, tim kami akan menghubungi Anda dalam 3-5 hari kerja untuk proses verifikasi dan orientasi relawan.
+                                        Setelah mendaftar, tim kami akan memverifikasi data Anda dan mengundang Anda ke grub WhatsApp. pastikan nomor yang anda masukkan benar.
                                     </p>
                                 </div>
                             </div>
