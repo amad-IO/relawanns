@@ -1,0 +1,34 @@
+# Node modules
+node_modules/
+
+# Build output
+build/
+dist/
+
+# Environment variables
+.env
+.env.local
+.env.production
+
+# Vercel (old config, use Netlify now)
+.vercel
+vercel.json
+
+# Old backend (not used anymore)
+api/
+backend/
+
+# Netlify
+.netlify
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+npm-debug.log*
