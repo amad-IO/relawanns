@@ -168,14 +168,20 @@ const EventHeroSection = () => {
                                 </div>
                                 <div>
                                     <div className="text-sm text-[--color-secondary] mb-1">Lokasi</div>
-                                    <div className="font-semibold text-black">
-                                        {eventData.location}
-                                        {eventData.locationMaps && eventData.locationMaps !== '#' && (
-                                            <a href={eventData.locationMaps} target="_blank" rel="noopener noreferrer" className="ml-2 text-[--color-primary] text-sm">
-                                                (Lihat di Maps)
-                                            </a>
-                                        )}
-                                    </div>
+                                    {eventData.locationMaps && eventData.locationMaps !== '#' ? (
+                                        <a
+                                            href={eventData.locationMaps}
+                                            target="_blank"
+                                            rel="noopener noreferrer"
+                                            className="font-semibold text-black hover:text-[--color-primary] transition-colors cursor-pointer"
+                                        >
+                                            {eventData.location}
+                                        </a>
+                                    ) : (
+                                        <div className="font-semibold text-black">
+                                            {eventData.location}
+                                        </div>
+                                    )}
                                 </div>
                             </div>
 
@@ -278,6 +284,26 @@ const EventDetailsSection = () => {
                                     {eventDetails.description}
                                 </p>
                             </motion.div>
+
+                            {/* Persyaratan - Moved from sidebar */}
+                            {eventDetails.requirements.length > 0 && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 20 }}
+                                    whileInView={{ opacity: 1, y: 0 }}
+                                    viewport={{ once: true }}
+                                    transition={{ duration: 0.5, delay: 0.2 }}
+                                >
+                                    <h3 className="mb-4">Persyaratan</h3>
+                                    <ul className="space-y-3">
+                                        {eventDetails.requirements.map((req, index) => (
+                                            <li key={index} className="flex items-start gap-2 text-[--color-secondary]">
+                                                <CheckCircle2 size={16} className="text-[--color-primary] mt-1 flex-shrink-0" />
+                                                <span>{req}</span>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </motion.div>
+                            )}
                         </div>
 
                         {/* Sidebar */}
@@ -296,7 +322,7 @@ const EventDetailsSection = () => {
                                     </div>
                                     <h5 className="text-black">Kuota Pendaftaran</h5>
                                 </div>
-                                <p className="text-2xl font-bold text-[--color-primary]">
+                                <p className="font-semibold text-black">
                                     {eventDetails.maxQuota} Relawanns
                                 </p>
                             </motion.div>
@@ -317,32 +343,6 @@ const EventDetailsSection = () => {
                                 </div>
                                 <p className="font-semibold text-black">{eventDetails.category}</p>
                             </motion.div>
-
-                            {/* Persyaratan */}
-                            {eventDetails.requirements.length > 0 && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: 20 }}
-                                    whileInView={{ opacity: 1, y: 0 }}
-                                    viewport={{ once: true }}
-                                    transition={{ duration: 0.5, delay: 0.2 }}
-                                    className="bg-[--color-gray-50] p-6 rounded-2xl"
-                                >
-                                    <div className="flex items-center gap-3 mb-4">
-                                        <div className="w-10 h-10 rounded-xl bg-white flex items-center justify-center">
-                                            <CheckCircle2 size={18} className="text-[--color-primary]" />
-                                        </div>
-                                        <h5 className="text-black">Persyaratan</h5>
-                                    </div>
-                                    <ul className="space-y-3">
-                                        {eventDetails.requirements.map((req, index) => (
-                                            <li key={index} className="flex items-start gap-2 text-[--color-secondary]">
-                                                <CheckCircle2 size={16} className="text-[--color-primary] mt-1 flex-shrink-0" />
-                                                <span className="text-sm">{req}</span>
-                                            </li>
-                                        ))}
-                                    </ul>
-                                </motion.div>
-                            )}
                         </div>
                     </div>
                 </div>
