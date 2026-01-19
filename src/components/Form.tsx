@@ -26,6 +26,33 @@ const Form = () => {
         city: ''
     });
 
+    // Registration status from API
+    const [registrationOpen, setRegistrationOpen] = useState(true);
+    const [statusLoading, setStatusLoading] = useState(true);
+
+    // Fetch registration status
+    React.useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                const response = await fetch('/api/check-status');
+                const result = await response.json();
+                if (result.success) {
+                    setRegistrationOpen(result.data.isOpen);
+                }
+            } catch (error) {
+                console.error('Failed to fetch registration status:', error);
+                setRegistrationOpen(false); // Fail-safe: close on error
+            } finally {
+                setStatusLoading(false);
+            }
+        };
+
+        fetchStatus();
+        // Refresh every 30 seconds
+        const interval = setInterval(fetchStatus, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     // Sanitize input to prevent XSS and SQL injection
     const sanitizeInput = (input: string): string => {
         // Don't sanitize during typing, only remove truly dangerous patterns
@@ -527,22 +554,38 @@ const Form = () => {
 
                                     {/* Submit Button */}
                                     <div className="flex justify-center">
-                                        <motion.button
-                                            type="submit"
-                                            disabled={isSubmitting}
-                                            whileHover={!isSubmitting ? { scale: 1.02 } : undefined}
-                                            whileTap={!isSubmitting ? { scale: 0.98 } : undefined}
-                                            className={`w-full max-w-xs py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all ${isSubmitting ? 'bg-gray-400 cursor-not-allowed' : 'bg-black hover:bg-gray-800 hover:shadow-xl'} text-white`}
-                                        >
-                                            {isSubmitting ? (
-                                                <>
-                                                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                    Mengirim...
-                                                </>
-                                            ) : (
-                                                'Daftar'
-                                            )}
-                                        </motion.button>
+                                        {!registrationOpen && !statusLoading ? (
+                                            <div className="w-full max-w-xs">
+                                                <div className="py-4 px-6 rounded-xl font-semibold text-center bg-red-100 text-red-700 border-2 border-red-300">
+                                                    Pendaftaran Ditutup
+                                                </div>
+                                                <p className="text-sm text-center text-gray-600 mt-3">
+                                                    Pendaftaran saat ini sedang ditutup. Silakan cek kembali nanti.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <motion.button
+                                                type="submit"
+                                                disabled={isSubmitting || statusLoading || !registrationOpen}
+                                                whileHover={!isSubmitting && registrationOpen && !statusLoading ? { scale: 1.02 } : undefined}
+                                                whileTap={!isSubmitting && registrationOpen && !statusLoading ? { scale: 0.98 } : undefined}
+                                                className={`w-full max-w-xs py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all ${(isSubmitting || statusLoading || !registrationOpen)
+                                                        ? 'bg-gray-400 cursor-not-allowed'
+                                                        : 'bg-black hover:bg-gray-800 hover:shadow-xl'
+                                                    } text-white`}
+                                            >
+                                                {statusLoading ? (
+                                                    'Memuat...'
+                                                ) : isSubmitting ? (
+                                                    <>
+                                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                                        Mengirim...
+                                                    </>
+                                                ) : (
+                                                    'Daftar'
+                                                )}
+                                            </motion.button>
+                                        )}
                                     </div>
 
                                     {/* Privacy Notice */}

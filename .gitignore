@@ -9,14 +9,13 @@ dist/
 .env
 .env.local
 .env.production
+.env.development
 
-# Vercel (old config, use Netlify now)
+# Bot folder (contains sensitive tokens and credentials)
+bot/
+
+# Vercel
 .vercel
-vercel.json
-
-# Old backend (not used anymore)
-api/
-backend/
 
 # Netlify
 .netlify
@@ -32,3 +31,13 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
+
+# Database backups
+*.sql.backup
+*.db
+
+# Sensitive files
+*secret*
+*private*
+*.pem
+*.key

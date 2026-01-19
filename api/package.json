@@ -1,0 +1,8 @@
+{
+    "name": "relawans-api",
+    "version": "1.0.0",
+    "type": "module",
+    "dependencies": {
+        "formidable": "^3.5.1"
+    }
+}

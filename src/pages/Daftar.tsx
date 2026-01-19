@@ -15,6 +15,60 @@ const Contact = () => {
 
 // Event Hero Section
 const EventHeroSection = () => {
+    const [registrationStatus, setRegistrationStatus] = useState({
+        isOpen: true,
+        message: 'Pendaftaran Dibuka',
+        loading: true
+    });
+
+    // Fetch registration status dari API
+    React.useEffect(() => {
+        const fetchStatus = async () => {
+            try {
+                // TEMPORARY: Hardcode untuk local dev
+                // TODO: Remove this when deploying to production
+                const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+
+                if (isDev) {
+                    // Local development: manually change this to test
+                    const isOpen = true; // CHANGE THIS: true = buka, false = tutup
+
+                    setRegistrationStatus({
+                        isOpen,
+                        message: isOpen ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
+                        loading: false
+                    });
+                    return;
+                }
+
+                // Production: fetch from API
+                const response = await fetch('/api/check-status');
+                const result = await response.json();
+
+                if (result.success) {
+                    setRegistrationStatus({
+                        isOpen: result.data.isOpen,
+                        message: result.data.isOpen ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
+                        loading: false
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to fetch status:', error);
+                // Fallback to closed status on error
+                setRegistrationStatus({
+                    isOpen: false,
+                    message: 'Pendaftaran Ditutup',
+                    loading: false
+                });
+            }
+        };
+
+        fetchStatus();
+        // Refresh status setiap 30 detik
+        const interval = setInterval(fetchStatus, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <section className="pt-20">
             <div className="container-custom">
@@ -32,8 +86,15 @@ const EventHeroSection = () => {
                             className="w-full h-full object-cover"
                         />
                         <div className="absolute top-6 left-6">
-                            <span className="inline-block px-4 py-2 bg-black text-white rounded-full text-sm font-semibold shadow-lg">
-                                Pendaftaran Dibuka
+                            <span
+                                className={`inline-block px-4 py-2 text-white rounded-full text-sm font-semibold shadow-lg transition-all duration-300 ${registrationStatus.loading
+                                    ? 'bg-gray-600'
+                                    : registrationStatus.isOpen
+                                        ? 'bg-black'
+                                        : 'bg-[--color-primary]'
+                                    }`}
+                            >
+                                {registrationStatus.loading ? 'Memuat...' : registrationStatus.message}
                             </span>
                         </div>
                     </motion.div>
