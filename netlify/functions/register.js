@@ -104,6 +104,7 @@ exports.handler = async function (event, context) {
         COALESCE(MAX(registration_number), 0) + 1 as next_number,
         (SELECT value::int FROM event_settings WHERE key = 'max_quota') as max_quota,
         (SELECT value::int FROM event_settings WHERE key = 'current_registrants') as current_count
+      FROM registrations
     `;
 
     const registrationNumber = registrationData.next_number;
