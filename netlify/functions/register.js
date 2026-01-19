@@ -3,7 +3,7 @@
 
 const postgres = require('postgres');
 const { createClient } = require('@supabase/supabase-js');
-const multiparty = require('multiparty');
+const Busboy = require('busboy');
 
 exports.handler = async function (event, context) {
   // Only allow POST
@@ -30,22 +30,51 @@ exports.handler = async function (event, context) {
       throw new Error('Missing required environment variables');
     }
 
-    // Parse multipart form data
-    const form = new multiparty.Form();
+    // Parse multipart form data with busboy
     const formData = await new Promise((resolve, reject) => {
-      form.parse(event, (err, fields, files) => {
-        if (err) reject(err);
-        else resolve({ fields, files });
+      const fields = {};
+      const files = {};
+
+      const busboy = Busboy({
+        headers: {
+          'content-type': event.headers['content-type'] || event.headers['Content-Type']
+        }
       });
+
+      busboy.on('file', (fieldname, file, info) => {
+        const { filename, encoding, mimeType } = info;
+        const chunks = [];
+
+        file.on('data', (data) => chunks.push(data));
+        file.on('end', () => {
+          files[fieldname] = {
+            buffer: Buffer.concat(chunks),
+            filename: filename,
+            mimeType: mimeType
+          };
+        });
+      });
+
+      busboy.on('field', (fieldname, value) => {
+        fields[fieldname] = value;
+      });
+
+      busboy.on('finish', () => resolve({ fields, files }));
+      busboy.on('error', reject);
+
+      // Netlify provides body as base64
+      const bodyBuffer = Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8');
+      busboy.write(bodyBuffer);
+      busboy.end();
     });
 
     // Extract form fields
-    const name = formData.fields.name?.[0];
-    const email = formData.fields.email?.[0];
-    const phone = formData.fields.phone?.[0];
-    const age = formData.fields.age?.[0];
-    const city = formData.fields.city?.[0];
-    const paymentProofFile = formData.files.paymentProof?.[0];
+    const name = formData.fields.name;
+    const email = formData.fields.email;
+    const phone = formData.fields.phone;
+    const age = formData.fields.age;
+    const city = formData.fields.city;
+    const paymentProofFile = formData.files.paymentProof;
 
     // Validate required fields
     if (!name || !email || !phone || !age || !city || !paymentProofFile) {
