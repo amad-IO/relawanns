@@ -129,17 +129,16 @@ exports.handler = async function (event, context) {
     // Upload file to Supabase Storage
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // Read file
-    const fs = require('fs');
-    const fileBuffer = fs.readFileSync(paymentProofFile.path);
-    const fileExt = paymentProofFile.originalFilename.split('.').pop();
+    // File already in buffer from busboy
+    const fileBuffer = paymentProofFile.buffer;
+    const fileExt = paymentProofFile.filename.split('.').pop();
     const fileName = `payment_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
     // Upload to storage
     const { data: uploadData, error: uploadError } = await supabase.storage
       .from('payment-proofs')
       .upload(fileName, fileBuffer, {
-        contentType: paymentProofFile.headers['content-type'],
+        contentType: paymentProofFile.mimeType,
         cacheControl: '3600',
         upsert: false
       });
