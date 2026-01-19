@@ -1,245 +1,232 @@
-// Netlify Function for Registration
-// Handles form submission + file upload + Telegram notification
+// Netlify Function: Registration Handler
+// Handles form submission, file upload, database storage, and Telegram notification
 
-const formidable = require('formidable');
-const fs = require('fs');
-const https = require('https');
+const postgres = require('postgres');
+const { createClient } = require('@supabase/supabase-js');
+const multiparty = require('multiparty');
 
-// Sanitize input to prevent XSS and SQL injection
-const sanitizeInput = (input) => {
-  if (typeof input !== 'string') return input;
-
-  let sanitized = input;
-
-  // Remove script tags
-  sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-
-  // Remove HTML tags
-  sanitized = sanitized.replace(/<[^>]*>/g, '');
-
-  // Remove SQL injection patterns
-  sanitized = sanitized.replace(/(\bSELECT\b.*\bFROM\b)/gi, '');
-  sanitized = sanitized.replace(/(\bINSERT\b.*\bINTO\b)/gi, '');
-  sanitized = sanitized.replace(/(\bUPDATE\b.*\bSET\b)/gi, '');
-  sanitized = sanitized.replace(/(\bDELETE\b.*\bFROM\b)/gi, '');
-  sanitized = sanitized.replace(/(\bDROP\b.*\bTABLE\b)/gi, '');
-
-  // Remove dangerous characters
-  sanitized = sanitized.replace(/['";`]/g, '');
-
-  return sanitized.trim();
-};
-
-// Validation functions
-const validateName = (name) => {
-  if (!name || typeof name !== 'string') return false;
-  if (!/^[a-zA-Z\s.]+$/.test(name)) return false;
-  if (name.length < 3 || name.length > 50) return false;
-  return true;
-};
-
-const validateEmail = (email) => {
-  if (!email || typeof email !== 'string') return false;
-  return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-};
-
-const validatePhone = (phone) => {
-  if (!phone || typeof phone !== 'string') return false;
-  return /^(08|62)\d{8,13}$/.test(phone);
-};
-
-const validateAge = (age) => {
-  const ageNum = parseInt(age);
-  if (isNaN(ageNum)) return false;
-  return ageNum >= 17 && ageNum <= 60;
-};
-
-const validateCity = (city) => {
-  if (!city || typeof city !== 'string') return false;
-  if (!/^[a-zA-Z\s]+$/.test(city)) return false;
-  return city.length <= 30;
-};
-
-// Parse form data using formidable
-const parseForm = (event) => {
-  return new Promise((resolve, reject) => {
-    const form = new formidable.IncomingForm({
-      maxFileSize: 2 * 1024 * 1024, // 2MB
-      keepExtensions: true,
-      filter: function ({ mimetype }) {
-        return ['image/jpeg', 'image/png', 'application/pdf'].includes(mimetype);
-      },
-    });
-
-    // Create a mock request object for formidable
-    const req = {
-      headers: event.headers,
-      method: event.httpMethod,
-    };
-
-    form.parse(req, (err, fields, files) => {
-      if (err) reject(err);
-      resolve({ fields, files });
-    });
-
-    // Write body to form
-    form.write(Buffer.from(event.body, event.isBase64Encoded ? 'base64' : 'utf8'));
-    form.end();
-  });
-};
-
-// Send notification to Telegram Bot
-const sendToTelegram = async (formData, file) => {
-  const BOT_TOKEN = process.env.BOT_TOKEN_NOTIFIKASI;
-  const CHAT_ID = process.env.CHAT_ID_NOTIFIKASI;
-
-  if (!BOT_TOKEN || !CHAT_ID) {
-    throw new Error('Telegram Bot credentials not configured');
-  }
-
-  try {
-    const caption = `✅ Pendaftaran Baru\n\nNama: ${formData.name}\nEmail: ${formData.email}\nWhatsApp: ${formData.phone}\nUsia: ${formData.age}\nKota: ${formData.city}`;
-
-    // Use fetch API (available in Node 18+)
-    const FormData = require('form-data');
-    const formDataTelegram = new FormData();
-    formDataTelegram.append('chat_id', CHAT_ID);
-    formDataTelegram.append('caption', caption);
-
-    // Read file and send
-    const fileBuffer = fs.readFileSync(file.filepath);
-    formDataTelegram.append('photo', fileBuffer, {
-      filename: file.originalFilename || 'bukti_transfer.jpg',
-      contentType: file.mimetype
-    });
-
-    const response = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
-      method: 'POST',
-      body: formDataTelegram,
-    });
-
-    const result = await response.json();
-
-    if (!result.ok) {
-      throw new Error(`Telegram API error: ${result.description}`);
-    }
-
-    return result;
-  } catch (error) {
-    console.error('Error sending to Telegram:', error);
-    throw error;
-  }
-};
-
-exports.handler = async (event) => {
-  // Only accept POST requests
+exports.handler = async function (event, context) {
+  // Only allow POST
   if (event.httpMethod !== 'POST') {
     return {
       statusCode: 405,
-      body: JSON.stringify({
-        success: false,
-        message: 'Method not allowed',
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
+      body: JSON.stringify({ success: false, error: 'Method not allowed' })
     };
   }
 
   try {
-    // Parse form data
-    const { fields, files } = await parseForm(event);
+    // Environment variables
+    const DATABASE_URL = process.env.DATABASE_URL;
+    const SUPABASE_URL = process.env.SUPABASE_URL;
+    const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const BOT_TOKEN = process.env.BOT_RELAWANNS_TOKEN;
+    const CHAT_ID = process.env.NOTIFICATION_CHAT_ID;
 
-    // Extract and sanitize fields
-    const name = sanitizeInput(fields.name?.[0] || fields.name);
-    const email = sanitizeInput(fields.email?.[0] || fields.email);
-    const phone = sanitizeInput(fields.phone?.[0] || fields.phone);
-    const age = sanitizeInput(fields.age?.[0] || fields.age);
-    const city = sanitizeInput(fields.city?.[0] || fields.city);
-    const paymentProof = files.paymentProof?.[0] || files.paymentProof;
-
-    // Validate all fields
-    const errors = {};
-
-    if (!validateName(name)) {
-      errors.name = 'Nama tidak valid';
-    }
-    if (!validateEmail(email)) {
-      errors.email = 'Format email tidak valid';
-    }
-    if (!validatePhone(phone)) {
-      errors.phone = 'Nomor WhatsApp tidak valid';
-    }
-    if (!validateAge(age)) {
-      errors.age = 'Usia harus antara 17–60 tahun';
-    }
-    if (!validateCity(city)) {
-      errors.city = 'Nama kota tidak valid';
-    }
-    if (!paymentProof) {
-      errors.file = 'Bukti pembayaran wajib diunggah';
+    if (!DATABASE_URL || !SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      throw new Error('Missing required environment variables');
     }
 
-    // Return errors if validation fails
-    if (Object.keys(errors).length > 0) {
+    // Parse multipart form data
+    const form = new multiparty.Form();
+    const formData = await new Promise((resolve, reject) => {
+      form.parse(event, (err, fields, files) => {
+        if (err) reject(err);
+        else resolve({ fields, files });
+      });
+    });
+
+    // Extract form fields
+    const name = formData.fields.name?.[0];
+    const email = formData.fields.email?.[0];
+    const phone = formData.fields.phone?.[0];
+    const age = formData.fields.age?.[0];
+    const city = formData.fields.city?.[0];
+    const paymentProofFile = formData.files.paymentProof?.[0];
+
+    // Validate required fields
+    if (!name || !email || !phone || !age || !city || !paymentProofFile) {
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
         body: JSON.stringify({
           success: false,
-          errors: errors,
-        }),
+          error: 'Semua field harus diisi termasuk bukti pembayaran'
+        })
       };
     }
 
-    // Validate file type and size
-    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (!allowedMimes.includes(paymentProof.mimetype)) {
+    // Connect to database
+    const sql = postgres(DATABASE_URL, {
+      max: 1,
+      idle_timeout: 20,
+      connect_timeout: 10,
+    });
+
+    // Get current registration number and max quota
+    const [registrationData] = await sql`
+      SELECT 
+        COALESCE(MAX(registration_number), 0) + 1 as next_number,
+        (SELECT value::int FROM event_settings WHERE key = 'max_quota') as max_quota,
+        (SELECT value::int FROM event_settings WHERE key = 'current_registrants') as current_count
+    `;
+
+    const registrationNumber = registrationData.next_number;
+    const maxQuota = registrationData.max_quota || 0;
+    const currentCount = registrationData.current_count || 0;
+
+    // Check if registration is full
+    if (currentCount >= maxQuota) {
+      await sql.end();
       return {
         statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
         body: JSON.stringify({
           success: false,
-          message: 'Tipe file tidak valid. Gunakan JPG, PNG, atau PDF',
-        }),
+          error: 'Maaf, pendaftaran sudah penuh'
+        })
       };
     }
 
-    if (paymentProof.size > 2 * 1024 * 1024) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          success: false,
-          message: 'Ukuran file maksimal 2MB',
-        }),
-      };
+    // Upload file to Supabase Storage
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+    // Read file
+    const fs = require('fs');
+    const fileBuffer = fs.readFileSync(paymentProofFile.path);
+    const fileExt = paymentProofFile.originalFilename.split('.').pop();
+    const fileName = `payment_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    // Upload to storage
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('payment-proofs')
+      .upload(fileName, fileBuffer, {
+        contentType: paymentProofFile.headers['content-type'],
+        cacheControl: '3600',
+        upsert: false
+      });
+
+    if (uploadError) {
+      await sql.end();
+      throw new Error(`Failed to upload file: ${uploadError.message}`);
     }
 
-    // Send to Telegram Bot
-    await sendToTelegram(
-      { name, email, phone, age, city },
-      paymentProof
-    );
+    // Get public URL
+    const { data: publicData } = supabase.storage
+      .from('payment-proofs')
+      .getPublicUrl(fileName);
 
-    // Clean up uploaded file
-    try {
-      fs.unlinkSync(paymentProof.filepath);
-    } catch (e) {
-      console.error('Error deleting temp file:', e);
+    const paymentProofUrl = publicData.publicUrl;
+
+    // Insert registration data
+    await sql`
+      INSERT INTO registrations (
+        name, email, phone, age, city, payment_proof_url, registration_number
+      ) VALUES (
+        ${name}, ${email}, ${phone}, ${parseInt(age)}, ${city}, ${paymentProofUrl}, ${registrationNumber}
+      )
+    `;
+
+    // Update current_registrants
+    await sql`
+      UPDATE event_settings 
+      SET value = ${(currentCount + 1).toString()}
+      WHERE key = 'current_registrants'
+    `;
+
+    await sql.end();
+
+    // Send Telegram notification
+    if (BOT_TOKEN && CHAT_ID) {
+      try {
+        const telegramMessage = `🆕 *PENDAFTAR BARU!*
+
+No. Pendaftar: *${registrationNumber} / ${maxQuota}*
+━━━━━━━━━━━━━━━━━
+👤 Nama: ${name}
+📧 Email: ${email}
+📱 WhatsApp: ${phone}
+🎂 Usia: ${age} tahun
+🏙️ Kota: ${city}
+━━━━━━━━━━━━━━━━━
+📅 Waktu: ${new Date().toLocaleString('id-ID')}`;
+
+        // Support multiple chat IDs (comma-separated)
+        // Format: "8278108288,1234567890,9876543210"
+        const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
+
+        // Send to each chat ID
+        for (const chatId of chatIds) {
+          try {
+            // Send message
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: telegramMessage,
+                parse_mode: 'Markdown'
+              })
+            });
+
+            // Send photo
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                photo: paymentProofUrl,
+                caption: '💳 Bukti Transfer'
+              })
+            });
+          } catch (singleChatError) {
+            console.error(`Failed to send to chat ${chatId}:`, singleChatError);
+            // Continue sending to other chats even if one fails
+          }
+        }
+      } catch (telegramError) {
+        console.error('Telegram notification failed:', telegramError);
+        // Don't fail the registration if Telegram fails
+      }
     }
 
-    // Return success response
     return {
       statusCode: 200,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({
         success: true,
-        message: 'Pendaftaran berhasil! Tim kami akan menghubungi Anda dalam 3-5 hari kerja.',
-      }),
+        data: {
+          registration_number: registrationNumber,
+          name: name
+        }
+      })
     };
+
   } catch (error) {
     console.error('Registration error:', error);
 
     return {
       statusCode: 500,
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*'
+      },
       body: JSON.stringify({
         success: false,
-        message: 'Terjadi kesalahan server. Silakan coba lagi.',
-      }),
+        error: 'Terjadi kesalahan saat mendaftar. Silakan coba lagi.'
+      })
     };
   }
 };

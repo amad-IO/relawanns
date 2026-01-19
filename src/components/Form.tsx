@@ -175,7 +175,7 @@ const Form = () => {
             }
 
             // Call serverless API
-            const response = await fetch('/api/register', {
+            const response = await fetch('/.netlify/functions/register', {
                 method: 'POST',
                 body: submitData,
             });
@@ -570,8 +570,8 @@ const Form = () => {
                                                 whileHover={!isSubmitting && registrationOpen && !statusLoading ? { scale: 1.02 } : undefined}
                                                 whileTap={!isSubmitting && registrationOpen && !statusLoading ? { scale: 0.98 } : undefined}
                                                 className={`w-full max-w-xs py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all ${(isSubmitting || statusLoading || !registrationOpen)
-                                                        ? 'bg-gray-400 cursor-not-allowed'
-                                                        : 'bg-black hover:bg-gray-800 hover:shadow-xl'
+                                                    ? 'bg-gray-400 cursor-not-allowed'
+                                                    : 'bg-black hover:bg-gray-800 hover:shadow-xl'
                                                     } text-white`}
                                             >
                                                 {statusLoading ? (
