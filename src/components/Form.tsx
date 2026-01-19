@@ -303,11 +303,11 @@ const Form = () => {
             return;
         }
 
-        // 5. Validasi ukuran file (max 2MB)
-        const maxSize = 2 * 1024 * 1024; // 2MB
+        // 5. Validasi ukuran file (max 5MB)
+        const maxSize = 5 * 1024 * 1024; // 5MB
         if (file.size > maxSize) {
             const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            setFileError(`Ukuran file terlalu besar (${fileSizeMB}MB). Maksimal 2MB`);
+            setFileError(`Ukuran file terlalu besar (${fileSizeMB}MB). Maksimal 5MB`);
             e.target.value = ''; // Reset input file
             return;
         }
