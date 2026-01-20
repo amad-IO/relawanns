@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, ZoomIn } from 'lucide-react';
@@ -17,6 +17,33 @@ const Gallery = () => {
 const GalleryContent = () => {
     const [selectedImage, setSelectedImage] = useState<any>(null);
     const [activeFilter, setActiveFilter] = useState('Semua');
+    const [driveLink, setDriveLink] = useState('https://drive.google.com'); // Default value
+
+    // Fetch drive link from database
+    useEffect(() => {
+        const fetchDriveLink = async () => {
+            try {
+                const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/event_settings?key=eq.link_drive&select=value`, {
+                    headers: {
+                        'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+                        'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
+                    }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data && data.length > 0 && data[0].value) {
+                        setDriveLink(data[0].value);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching drive link:', error);
+                // Keep default value on error
+            }
+        };
+
+        fetchDriveLink();
+    }, []);
 
     const filters = ['Semua', 'Pendidikan', 'Kesehatan', 'Lingkungan', 'Event', 'Sosial'];
 
@@ -219,7 +246,7 @@ const GalleryContent = () => {
                         </p>
 
                         <a
-                            href="https://drive.google.com"
+                            href={driveLink}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="btn-primary inline-block mb-8"

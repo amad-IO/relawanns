@@ -209,7 +209,13 @@ const EventHeroSection = () => {
 
 // Event Details Section with Dynamic Data
 const EventDetailsSection = () => {
-    const [eventDetails, setEventDetails] = useState({
+    const [eventDetails, setEventDetails] = useState<{
+        description: string;
+        requirements: string[];
+        maxQuota: number;
+        category: string;
+        loading: boolean;
+    }>({
         description: 'Memuat deskripsi...',
         requirements: [],
         maxQuota: 0,
