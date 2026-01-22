@@ -172,6 +172,20 @@ exports.handler = async function (event, context) {
       WHERE key = 'current_registrants'
     `;
 
+    // CHECK QUOTA & AUTO-CLOSE
+    const newCount = currentCount + 1;
+    let isQuotaFull = false;
+
+    if (newCount >= maxQuota) {
+      isQuotaFull = true;
+      // Auto-close registration
+      await sql`
+        UPDATE event_settings 
+        SET value = 'closed'
+        WHERE key = 'registration_status'
+      `;
+    }
+
     await sql.end();
 
     // Send Telegram notification
@@ -215,6 +229,30 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
       } catch (telegramError) {
         console.error('Telegram notification failed:', telegramError);
         // Don't fail the registration if Telegram fails
+      }
+
+      // Special Notification if Quota Full
+      if (isQuotaFull) {
+        try {
+          const quotaMessage = `🚨 *KUOTA TERPENUHI!*\n\n` +
+            `Pendaftaran otomatis DITUTUP sistem.\n` +
+            `Total: ${newCount} / ${maxQuota}`;
+
+          const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
+          for (const chatId of chatIds) {
+            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                chat_id: chatId,
+                text: quotaMessage,
+                parse_mode: 'Markdown'
+              })
+            });
+          }
+        } catch (e) {
+          console.error('Failed to send quota notification', e);
+        }
       }
     }
 
