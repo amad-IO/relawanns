@@ -196,8 +196,8 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
         // Send to each chat ID
         for (const chatId of chatIds) {
           try {
-            // Send photo with caption (Single Bubble)
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            // Send photo with caption (Single Bubble, with Smart Retry)
+            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -249,3 +249,26 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
     };
   }
 };
+
+// Start Retry Helper
+async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
+  try {
+    const response = await fetch(url, options);
+
+    // If 429 (Too Many Requests) or Server Error, throw to trigger retry
+    if (!response.ok && (response.status === 429 || response.status >= 500)) {
+      const errorBody = await response.text();
+      throw new Error(`HTTP Error ${response.status}: ${errorBody}`);
+    }
+
+    return response;
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`[Smart Retry] Request failed. Retrying in ${backoff}ms... (${retries} attempts left). Reason: ${error.message}`);
+      await new Promise(resolve => setTimeout(resolve, backoff));
+      return fetchWithRetry(url, options, retries - 1, backoff * 2); // Exponential backoff
+    }
+    throw error;
+  }
+}
+
