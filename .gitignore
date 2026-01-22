@@ -5,6 +5,9 @@ node_modules/
 build/
 dist/
 
+# Scripts
+script/
+
 # Environment variables
 .env
 .env.local
