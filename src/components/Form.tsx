@@ -16,6 +16,7 @@ const Form = () => {
 
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [compressedFile, setCompressedFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState('Mengirim...');
     const [fileName, setFileName] = useState('');
     const [fileError, setFileError] = useState('');
@@ -191,15 +192,20 @@ const Form = () => {
                 throw new Error('Validasi gagal. Silakan periksa kembali data Anda.');
             }
 
-            // 3. Compress image if exists
+            // 3. Use compressed image if available (Background Compression)
             let fileToUpload = formData.paymentProof;
-            if (fileToUpload) {
+
+            // Check if we already have the compressed version ready from background process
+            if (compressedFile) {
+                fileToUpload = compressedFile;
+            } else if (fileToUpload && fileToUpload.type.startsWith('image/')) {
+                // Fallback: If background compression hasn't finished yet, do it here
+                // But use optimized settings (0.8MB, 1280px) for speed
                 setStatusMessage('Mengompres...');
                 try {
-                    // Compress to max 1MB
-                    fileToUpload = await compressImage(fileToUpload, 1);
+                    fileToUpload = await compressImage(fileToUpload, 0.8, 1280);
                 } catch (err) {
-                    console.warn('Compression failed, using original file', err);
+                    console.warn('Fallback compression failed, using original', err);
                 }
             }
 
@@ -294,6 +300,7 @@ const Form = () => {
             ...formData,
             paymentProof: null
         });
+        setCompressedFile(null);
 
         // 1. Validasi ekstensi file (ekstraksi yang benar)
         const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
@@ -378,6 +385,22 @@ const Form = () => {
             paymentProof: file
         });
         setFileName(file.name);
+
+        // BACKGROUND COMPRESSION
+        // Immediately start compressing the image so it's ready by the time user clicks submit
+        if (file.type.startsWith('image/')) {
+            compressImage(file, 0.8, 1280) // Optimized: 0.8MB max, 1280px max width (faster)
+                .then(result => {
+                    setCompressedFile(result);
+                })
+                .catch(err => {
+                    console.warn('Background compression failed:', err);
+                    // If background fails, we'll try again on submit or use original
+                });
+        } else {
+            // PDFs don't need compression
+            setCompressedFile(file);
+        }
     };
 
     const handleRemoveFile = () => {
@@ -392,8 +415,9 @@ const Form = () => {
             ...formData,
             paymentProof: null
         });
-        setFileName('');
         setFileError('');
+        setFileName('');
+        setCompressedFile(null);
     };
 
     return (
