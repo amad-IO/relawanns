@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'motion/react';
 import { CheckCircle2, Upload, X, Clock } from 'lucide-react';
 import ValidationDialog from './ValidationDialog';
+import { compressImage } from '../utils/imageCompression';
 
 const Form = () => {
     const [formData, setFormData] = useState({
@@ -15,6 +16,7 @@ const Form = () => {
 
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('Mengirim...');
     const [fileName, setFileName] = useState('');
     const [fileError, setFileError] = useState('');
     const [showDialog, setShowDialog] = useState(false);
@@ -54,8 +56,10 @@ const Form = () => {
     }, []);
 
     // Sanitize input to prevent XSS and SQL injection
+    // NOTE: Runs only on submission to prevent input lag
     const sanitizeInput = (input: string): string => {
-        // Don't sanitize during typing, only remove truly dangerous patterns
+        if (!input) return '';
+
         let sanitized = input;
 
         // Remove script tags
@@ -106,14 +110,14 @@ const Form = () => {
             case 'phone':
                 // WhatsApp: 08 atau 62, panjang 10-15 digit
                 if (!/^(08|62)\d{8,13}$/.test(value)) {
-                    error = 'Nomor WhatsApp tidak valid';
+                    error = 'Nomor WhatsApp tidak valid (awali dengan 08 atau 62)';
                 }
                 break;
             case 'age':
                 const ageNum = parseInt(value);
                 // Usia 17-60 tahun
                 if (isNaN(ageNum) || ageNum < 17 || ageNum > 60) {
-                    error = 'Usia tidak valid';
+                    error = 'Usia tidak valid (17-60)';
                 }
                 break;
             case 'city':
@@ -161,17 +165,55 @@ const Form = () => {
     const handleConfirmSubmit = async () => {
         setShowDialog(false);
         setIsSubmitting(true);
+        setStatusMessage('Memproses...');
 
         try {
-            // Prepare form data for API
+            // 1. Sanitize data before sending (moved from handleChange to here)
+            const cleanData = {
+                name: sanitizeInput(formData.name),
+                email: sanitizeInput(formData.email),
+                phone: sanitizeInput(formData.phone),
+                age: sanitizeInput(formData.age),
+                city: sanitizeInput(formData.city)
+            };
+
+            // 2. Refresh validation on sanitized data
+            const errors = {
+                name: validateField('name', cleanData.name),
+                email: validateField('email', cleanData.email),
+                phone: validateField('phone', cleanData.phone),
+                age: validateField('age', cleanData.age),
+                city: validateField('city', cleanData.city)
+            };
+
+            if (Object.values(errors).some(error => error !== '')) {
+                setValidationErrors(errors);
+                throw new Error('Validasi gagal. Silakan periksa kembali data Anda.');
+            }
+
+            // 3. Compress image if exists
+            let fileToUpload = formData.paymentProof;
+            if (fileToUpload) {
+                setStatusMessage('Mengompres...');
+                try {
+                    // Compress to max 1MB
+                    fileToUpload = await compressImage(fileToUpload, 1);
+                } catch (err) {
+                    console.warn('Compression failed, using original file', err);
+                }
+            }
+
+            setStatusMessage('Mengirim...');
+
+            // 4. Prepare form data for API
             const submitData = new FormData();
-            submitData.append('name', formData.name);
-            submitData.append('email', formData.email);
-            submitData.append('phone', formData.phone);
-            submitData.append('age', formData.age);
-            submitData.append('city', formData.city);
-            if (formData.paymentProof) {
-                submitData.append('paymentProof', formData.paymentProof);
+            submitData.append('name', cleanData.name);
+            submitData.append('email', cleanData.email);
+            submitData.append('phone', cleanData.phone);
+            submitData.append('age', cleanData.age);
+            submitData.append('city', cleanData.city);
+            if (fileToUpload) {
+                submitData.append('paymentProof', fileToUpload);
             }
 
             // Call serverless API
@@ -221,15 +263,17 @@ const Form = () => {
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value } = e.target;
-        const sanitizedValue = sanitizeInput(value);
+
+        // Performance fix: REMOVED sanitizeInput from here.
+        // It runs only on submit now to prevent input lag.
 
         setFormData({
             ...formData,
-            [name]: sanitizedValue
+            [name]: value
         });
 
         // Validasi real-time saat user mengetik
-        const error = validateField(name, sanitizedValue);
+        const error = validateField(name, value);
         setValidationErrors({
             ...validationErrors,
             [name]: error
@@ -579,7 +623,7 @@ const Form = () => {
                                                 ) : isSubmitting ? (
                                                     <>
                                                         <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                        Mengirim...
+                                                        {statusMessage}
                                                     </>
                                                 ) : (
                                                     'Daftar'
