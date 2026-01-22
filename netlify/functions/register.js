@@ -196,25 +196,15 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
         // Send to each chat ID
         for (const chatId of chatIds) {
           try {
-            // Send message
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: telegramMessage,
-                parse_mode: 'Markdown'
-              })
-            });
-
-            // Send photo
+            // Send photo with caption (Single Bubble)
             await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId,
                 photo: paymentProofUrl,
-                caption: '💳 Bukti Transfer'
+                caption: telegramMessage,
+                parse_mode: 'Markdown'
               })
             });
           } catch (singleChatError) {
