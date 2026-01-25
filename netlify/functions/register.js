@@ -189,6 +189,9 @@ exports.handler = async function (event, context) {
     await sql.end();
 
     // Send Telegram notification
+    console.log(`[Env Debug] BOT_TOKEN exists: ${!!BOT_TOKEN}`);
+    console.log(`[Env Debug] CHAT_ID exists: ${!!CHAT_ID}, Value: ${CHAT_ID}`);
+
     if (BOT_TOKEN && CHAT_ID) {
       try {
         const telegramMessage = `🆕 *PENDAFTAR BARU!*
