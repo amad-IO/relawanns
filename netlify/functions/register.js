@@ -222,7 +222,16 @@ exports.handler = async function (event, context) {
       console.log(`✅ Data written to Google Sheet: ${sheetFolderName}`);
 
     } catch (googleError) {
-      console.error('Google Workspace error:', googleError);
+      console.error('❌ Google Workspace Integration FAILED:', googleError);
+      console.error('Error details:', {
+        message: googleError.message,
+        stack: googleError.stack,
+        envVarsSet: {
+          GOOGLE_SPREADSHEET_ID: !!process.env.GOOGLE_SPREADSHEET_ID,
+          GOOGLE_DRIVE_FOLDER_ID: !!process.env.GOOGLE_DRIVE_FOLDER_ID,
+          GOOGLE_CREDENTIALS_JSON: !!process.env.GOOGLE_CREDENTIALS_JSON,
+        }
+      });
       // Continue execution even if Google integration fails (PostgreSQL is still saved)
     }
     // === END GOOGLE WORKSPACE INTEGRATION ===
