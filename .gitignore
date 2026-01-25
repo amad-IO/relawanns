@@ -44,3 +44,6 @@ npm-debug.log*
 *private*
 *.pem
 *.key
+
+# Google Credentials
+credentials.json

@@ -1,32 +1,153 @@
-import React, { useState } from 'react';
-import { motion } from 'motion/react';
-import { CheckCircle2, Upload, X, Clock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
+import { CheckCircle2, Upload, X, ChevronRight, ChevronLeft, AlertCircle, ChevronDown } from 'lucide-react';
 import ValidationDialog from './ValidationDialog';
 import { compressImage } from '../utils/imageCompression';
 
+// ... (existing code) ...
+
+// AFTER the main Form component and BEFORE export default
+
+interface DropdownOption {
+    value: string;
+    label: string;
+}
+
+const CustomDropdown = ({
+    value,
+    onChange,
+    options,
+    placeholder,
+    error
+}: {
+    value: string;
+    onChange: (val: string) => void;
+    options: DropdownOption[];
+    placeholder: string;
+    error?: string;
+}) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => document.removeEventListener('mousedown', handleClickOutside);
+    }, []);
+
+    const selectedLabel = options.find(opt => opt.value === value)?.label || value;
+
+    return (
+        <div className="relative" ref={containerRef}>
+            <div
+                onClick={() => setIsOpen(!isOpen)}
+                className={`w-full px-4 py-3 border rounded-xl flex justify-between items-center cursor-pointer bg-white transition-all ${error ? 'border-red-500' : isOpen ? 'border-black ring-1 ring-black' : 'border-gray-200'
+                    }`}
+            >
+                <span className={value ? "text-black font-medium" : "text-gray-400"}>
+                    {value ? selectedLabel : placeholder}
+                </span>
+                <ChevronDown size={20} className={`text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`} />
+            </div>
+
+            <AnimatePresence>
+                {isOpen && (
+                    <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -10 }}
+                        transition={{ duration: 0.2 }}
+                        className="absolute z-10 w-full mt-2 bg-white border border-gray-100 rounded-xl shadow-xl max-h-60 overflow-auto"
+                    >
+                        {options.map((opt) => (
+                            <motion.div
+                                key={opt.value}
+                                whileTap={{ scale: 0.98, backgroundColor: "#f3f4f6" }}
+                                onClick={() => {
+                                    onChange(opt.value);
+                                    setIsOpen(false);
+                                }}
+                                className={`px-4 py-3 cursor-pointer text-sm transition-colors ${value === opt.value ? 'bg-gray-50 text-black font-semibold' : 'text-gray-600 hover:bg-gray-50 hover:text-black active:bg-gray-100'
+                                    }`}
+                            >
+                                {opt.label}
+                            </motion.div>
+                        ))}
+                    </motion.div>
+                )}
+            </AnimatePresence>
+            <ErrorMsg msg={error || ''} />
+        </div>
+    );
+};
+
+// ... existing sub-components ...
+
 const Form = () => {
-    const [formData, setFormData] = useState({
+    // Current Step: 1, 2, or 3
+    const [currentStep, setCurrentStep] = useState(1);
+    const formRef = useRef<HTMLDivElement>(null);
+
+    const [formData, setFormData] = useState<{
+        name: string;
+        email: string;
+        phone: string;
+        age: string;
+        city: string;
+        instagramUsername: string;
+        participationHistory: string;
+        vestSize: string;
+        tiktokProof: File | null;
+        instagramProof: File | null;
+        paymentProof: File | null;
+    }>({
         name: '',
         email: '',
         phone: '',
         age: '',
         city: '',
-        paymentProof: null as File | null
+        instagramUsername: '',
+        participationHistory: '',
+        vestSize: '',
+        tiktokProof: null,
+        instagramProof: null,
+        paymentProof: null
     });
+
+    const [compressedPayment, setCompressedPayment] = useState<File | null>(null);
 
     const [isSubmitted, setIsSubmitted] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [compressedFile, setCompressedFile] = useState<File | null>(null);
     const [statusMessage, setStatusMessage] = useState('Mengirim...');
-    const [fileName, setFileName] = useState('');
-    const [fileError, setFileError] = useState('');
+
+    // File Names for display
+    const [fileNames, setFileNames] = useState({
+        payment: '',
+        tiktok: '',
+        instagram: ''
+    });
+
+    // File Errors
+    const [fileErrors, setFileErrors] = useState({
+        payment: '',
+        tiktok: '',
+        instagram: ''
+    });
+
     const [showDialog, setShowDialog] = useState(false);
     const [validationErrors, setValidationErrors] = useState({
         name: '',
         email: '',
         phone: '',
         age: '',
-        city: ''
+        city: '',
+        instagramUsername: '',
+        participationHistory: '',
+        vestSize: ''
     });
 
     // Registration status from API
@@ -34,7 +155,7 @@ const Form = () => {
     const [statusLoading, setStatusLoading] = useState(true);
 
     // Fetch registration status
-    React.useEffect(() => {
+    useEffect(() => {
         const fetchStatus = async () => {
             try {
                 const response = await fetch('/api/check-status');
@@ -44,645 +165,519 @@ const Form = () => {
                 }
             } catch (error) {
                 console.error('Failed to fetch registration status:', error);
-                setRegistrationOpen(false); // Fail-safe: close on error
+                setRegistrationOpen(false);
             } finally {
                 setStatusLoading(false);
             }
         };
 
         fetchStatus();
-        // Refresh every 30 seconds
         const interval = setInterval(fetchStatus, 30000);
         return () => clearInterval(interval);
     }, []);
 
-    // Sanitize input to prevent XSS and SQL injection
-    // NOTE: Runs only on submission to prevent input lag
+    // Sanitize input
     const sanitizeInput = (input: string): string => {
         if (!input) return '';
-
         let sanitized = input;
-
-        // Remove script tags
         sanitized = sanitized.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '');
-
-        // Remove other HTML tags but preserve content
         sanitized = sanitized.replace(/<[^>]*>/g, '');
-
-        // Remove SQL injection patterns (common keywords in malicious context)
         sanitized = sanitized.replace(/(\bSELECT\b.*\bFROM\b)/gi, '');
         sanitized = sanitized.replace(/(\bINSERT\b.*\bINTO\b)/gi, '');
-        sanitized = sanitized.replace(/(\bUPDATE\b.*\bSET\b)/gi, '');
-        sanitized = sanitized.replace(/(\bDELETE\b.*\bFROM\b)/gi, '');
-        sanitized = sanitized.replace(/(\bDROP\b.*\bTABLE\b)/gi, '');
-
-        // Remove semicolons that could be used for SQL injection
-        sanitized = sanitized.replace(/;/g, '');
-
-        return sanitized;
+        return sanitized.replace(/;/g, '');
     };
 
-    // Validate individual fields
+    // Validation Logic
     const validateField = (name: string, value: string): string => {
-        let error = '';
-
-        // Jangan validasi jika field kosong (kecuali untuk submit)
-        if (!value || value.trim() === '') {
-            return '';
-        }
+        if (!value || value.trim() === '') return '';
 
         switch (name) {
             case 'name':
-                // Hanya huruf, spasi, dan titik
-                if (!/^[a-zA-Z\s.]+$/.test(value)) {
-                    error = 'Nama lengkap tidak valid';
-                } else if (value.length < 3) {
-                    error = 'Nama lengkap tidak valid';
-                } else if (value.length > 50) {
-                    error = 'Nama lengkap tidak valid';
-                }
+                if (!/^[a-zA-Z\s.]+$/.test(value) || value.length < 3) return 'Nama lengkap tidak valid';
                 break;
             case 'email':
-                // Validasi email dengan regex ketat
-                if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) {
-                    error = 'Email tidak valid';
-                }
+                if (!/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(value)) return 'Email tidak valid';
                 break;
             case 'phone':
-                // WhatsApp: 08 atau 62, panjang 10-15 digit
-                if (!/^(08|62)\d{8,13}$/.test(value)) {
-                    error = 'Nomor WhatsApp tidak valid (awali dengan 08 atau 62)';
-                }
+                if (!/^(08|62)\d{8,13}$/.test(value)) return 'Nomor WhatsApp tidak valid (awali 08/62)';
                 break;
             case 'age':
                 const ageNum = parseInt(value);
-                // Usia 17-60 tahun
-                if (isNaN(ageNum) || ageNum < 17 || ageNum > 60) {
-                    error = 'Usia tidak valid (17-60)';
-                }
+                if (isNaN(ageNum) || ageNum < 17 || ageNum > 60) return 'Usia tidak valid (17-60)';
                 break;
             case 'city':
-                // Hanya huruf dan spasi, max 30 karakter
-                if (!/^[a-zA-Z\s]+$/.test(value)) {
-                    error = 'Kota domisili tidak valid';
-                } else if (value.length > 30) {
-                    error = 'Kota domisili tidak valid';
-                }
+                if (!/^[a-zA-Z\s]+$/.test(value) || value.length > 30) return 'Kota domisili tidak valid';
+                break;
+            case 'instagramUsername':
+                if (!value.startsWith('@')) return 'Username harus diawali dengan @';
+                if (value.length < 3) return 'Username terlalu pendek';
                 break;
         }
+        return '';
+    };
 
-        return error;
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+
+        // Real-time validation
+        const error = validateField(name, value);
+        setValidationErrors(prev => ({ ...prev, [name]: error }));
+    };
+
+    // Generic File Handler
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fieldName: 'paymentProof' | 'tiktokProof' | 'instagramProof') => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Reset errors for this field
+        const key = fieldName === 'paymentProof' ? 'payment' : fieldName === 'tiktokProof' ? 'tiktok' : 'instagram';
+
+        setFileErrors(prev => ({ ...prev, [key]: '' }));
+        setFileNames(prev => ({ ...prev, [key]: '' }));
+        setFormData(prev => ({ ...prev, [fieldName]: null }));
+        if (fieldName === 'paymentProof') setCompressedPayment(null);
+
+        // Validation
+        const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
+        const extension = file.name.split('.').pop()?.toLowerCase();
+
+        if (!extension || !allowedExtensions.includes(extension)) {
+            setFileErrors(prev => ({ ...prev, [key]: 'Hanya JPG, PNG, atau PDF' }));
+            e.target.value = '';
+            return;
+        }
+
+        if (file.size > 5 * 1024 * 1024) {
+            setFileErrors(prev => ({ ...prev, [key]: 'Maksimal ukuran 5MB' }));
+            e.target.value = '';
+            return;
+        }
+
+        // Success
+        setFormData(prev => ({ ...prev, [fieldName]: file }));
+        setFileNames(prev => ({ ...prev, [key]: file.name }));
+
+        // Background Compression (only for payment proof for now)
+        if (fieldName === 'paymentProof' && file.type.startsWith('image/')) {
+            compressImage(file, 0.8, 1280).then(res => setCompressedPayment(res)).catch(console.warn);
+        }
+    };
+
+    const removeFile = (fieldName: 'paymentProof' | 'tiktokProof' | 'instagramProof') => {
+        const key = fieldName === 'paymentProof' ? 'payment' : fieldName === 'tiktokProof' ? 'tiktok' : 'instagram';
+        setFormData(prev => ({ ...prev, [fieldName]: null }));
+        setFileNames(prev => ({ ...prev, [key]: '' }));
+        const input = document.getElementById(fieldName) as HTMLInputElement;
+        if (input) input.value = '';
+    };
+
+    // Step Navigation Validation
+    const validateStep = (step: number) => {
+        const errors: any = {};
+        let isValid = true;
+
+        if (step === 1) {
+            if (!formData.name) errors.name = 'Wajib diisi';
+            if (!formData.email) errors.email = 'Wajib diisi';
+            if (!formData.phone) errors.phone = 'Wajib diisi';
+            if (!formData.age) errors.age = 'Wajib diisi';
+            if (!formData.city) errors.city = 'Wajib diisi';
+            if (!formData.instagramUsername) errors.instagramUsername = 'Wajib diisi';
+            if (!formData.participationHistory) errors.participationHistory = 'Wajib dipilih';
+
+            if (Object.keys(errors).length > 0) isValid = false;
+            if (Object.values(validationErrors).some(e => e !== '')) isValid = false;
+        }
+
+        if (step === 2) {
+            if (!formData.vestSize) errors.vestSize = 'Wajib dipilih';
+
+            if (Object.keys(errors).length > 0) isValid = false;
+        }
+
+        setValidationErrors(prev => ({ ...prev, ...errors }));
+        return isValid;
+    };
+
+    const nextStep = () => {
+        if (validateStep(currentStep)) {
+            setCurrentStep(prev => prev + 1);
+            formRef.current?.scrollIntoView({ behavior: 'smooth' });
+        }
+    };
+
+    const prevStep = () => {
+        setCurrentStep(prev => prev - 1);
+        formRef.current?.scrollIntoView({ behavior: 'smooth' });
     };
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
 
-        // Validate all fields
-        const errors = {
-            name: validateField('name', formData.name),
-            email: validateField('email', formData.email),
-            phone: validateField('phone', formData.phone),
-            age: validateField('age', formData.age),
-            city: validateField('city', formData.city)
-        };
+        let isValid = true;
 
-        setValidationErrors(errors);
-
-        // Check if there are any errors
-        if (Object.values(errors).some(error => error !== '')) {
-            return;
+        if (!formData.tiktokProof) {
+            setFileErrors(prev => ({ ...prev, tiktok: 'Bukti follow TikTok wajib diunggah' }));
+            isValid = false;
         }
-
+        if (!formData.instagramProof) {
+            setFileErrors(prev => ({ ...prev, instagram: 'Bukti follow IG wajib diunggah' }));
+            isValid = false;
+        }
         if (!formData.paymentProof) {
-            setFileError('Bukti pembayaran wajib diunggah');
-            return;
+            setFileErrors(prev => ({ ...prev, payment: 'Bukti pembayaran wajib diunggah' }));
+            isValid = false;
         }
 
-        // Show confirmation dialog instead of submitting directly
+        if (!isValid) return;
+
         setShowDialog(true);
     };
 
-    // Final submit after user confirms
     const handleConfirmSubmit = async () => {
         setShowDialog(false);
         setIsSubmitting(true);
         setStatusMessage('Memproses...');
 
         try {
-            // 1. Sanitize data before sending (moved from handleChange to here)
+            // Prepare Submission
+            const submitData = new FormData();
+
+            // Sanitize
             const cleanData = {
                 name: sanitizeInput(formData.name),
                 email: sanitizeInput(formData.email),
                 phone: sanitizeInput(formData.phone),
                 age: sanitizeInput(formData.age),
-                city: sanitizeInput(formData.city)
+                city: sanitizeInput(formData.city),
+                instagramUsername: sanitizeInput(formData.instagramUsername),
+                participationHistory: formData.participationHistory,
+                vestSize: formData.vestSize
             };
 
-            // 2. Refresh validation on sanitized data
-            const errors = {
-                name: validateField('name', cleanData.name),
-                email: validateField('email', cleanData.email),
-                phone: validateField('phone', cleanData.phone),
-                age: validateField('age', cleanData.age),
-                city: validateField('city', cleanData.city)
-            };
+            // Append Text Fields
+            Object.keys(cleanData).forEach(key => {
+                submitData.append(key, cleanData[key as keyof typeof cleanData]);
+            });
 
-            if (Object.values(errors).some(error => error !== '')) {
-                setValidationErrors(errors);
-                throw new Error('Validasi gagal. Silakan periksa kembali data Anda.');
+            // Append Files
+            if (compressedPayment) {
+                submitData.append('paymentProof', compressedPayment);
+            } else if (formData.paymentProof) {
+                submitData.append('paymentProof', formData.paymentProof);
             }
 
-            // 3. Use compressed image if available (Background Compression)
-            let fileToUpload = formData.paymentProof;
+            if (formData.tiktokProof) submitData.append('tiktokProof', formData.tiktokProof);
+            if (formData.instagramProof) submitData.append('instagramProof', formData.instagramProof);
 
-            // Check if we already have the compressed version ready from background process
-            if (compressedFile) {
-                fileToUpload = compressedFile;
-            } else if (fileToUpload && fileToUpload.type.startsWith('image/')) {
-                // Fallback: If background compression hasn't finished yet, do it here
-                // But use optimized settings (0.8MB, 1280px) for speed
-                setStatusMessage('Mengompres...');
-                try {
-                    fileToUpload = await compressImage(fileToUpload, 0.8, 1280);
-                } catch (err) {
-                    console.warn('Fallback compression failed, using original', err);
-                }
-            }
-
-            setStatusMessage('Mengirim...');
-
-            // 4. Prepare form data for API
-            const submitData = new FormData();
-            submitData.append('name', cleanData.name);
-            submitData.append('email', cleanData.email);
-            submitData.append('phone', cleanData.phone);
-            submitData.append('age', cleanData.age);
-            submitData.append('city', cleanData.city);
-            if (fileToUpload) {
-                submitData.append('paymentProof', fileToUpload);
-            }
-
-            // Call serverless API
+            // API Call
             const response = await fetch('/.netlify/functions/register', {
                 method: 'POST',
-                body: submitData,
+                body: submitData
             });
 
             const result = await response.json();
-
             if (!response.ok || !result.success) {
                 throw new Error(result.message || 'Terjadi kesalahan saat mendaftar');
             }
 
-            // Show success state
             setIsSubmitted(true);
             setIsSubmitting(false);
 
-            // Reset form after 3 seconds
+            // Reset after delay
             setTimeout(() => {
                 setIsSubmitted(false);
+                setCurrentStep(1);
                 setFormData({
-                    name: '',
-                    email: '',
-                    phone: '',
-                    age: '',
-                    city: '',
-                    paymentProof: null
+                    name: '', email: '', phone: '', age: '', city: '',
+                    instagramUsername: '', participationHistory: '', vestSize: '',
+                    tiktokProof: null, instagramProof: null, paymentProof: null
                 });
-                setFileName('');
-                setFileError('');
-                setValidationErrors({
-                    name: '',
-                    email: '',
-                    phone: '',
-                    age: '',
-                    city: ''
-                });
+                setFileNames({ payment: '', tiktok: '', instagram: '' });
+                setFileErrors({ payment: '', tiktok: '', instagram: '' });
             }, 3000);
-        } catch (error: unknown) {
+
+        } catch (error: any) {
             console.error('Submission error:', error);
             setIsSubmitting(false);
-            const errorMessage = error instanceof Error ? error.message : 'Terjadi kesalahan. Silakan coba lagi.';
-            alert(errorMessage);
+            alert(error.message || 'Terjadi kesalahan saat mendaftar');
         }
-    };
-
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value } = e.target;
-
-        // Performance fix: REMOVED sanitizeInput from here.
-        // It runs only on submit now to prevent input lag.
-
-        setFormData({
-            ...formData,
-            [name]: value
-        });
-
-        // Validasi real-time saat user mengetik
-        const error = validateField(name, value);
-        setValidationErrors({
-            ...validationErrors,
-            [name]: error
-        });
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-
-        if (!file) {
-            return;
-        }
-
-        // Reset state
-        setFileError('');
-        setFileName('');
-        setFormData({
-            ...formData,
-            paymentProof: null
-        });
-        setCompressedFile(null);
-
-        // 1. Validasi ekstensi file (ekstraksi yang benar)
-        const allowedExtensions = ['jpg', 'jpeg', 'png', 'pdf'];
-        const fileNameLower = file.name.toLowerCase();
-        const extension = fileNameLower.split('.').pop();
-
-        if (!extension || !allowedExtensions.includes(extension)) {
-            setFileError('Hanya file JPG, PNG, atau PDF yang diperbolehkan');
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // 2. Check double extension berbahaya (e.g., .jpg.php, .png.exe)
-        // Ambil 2 ekstensi terakhir untuk deteksi
-        const filenameParts = file.name.split('.');
-        if (filenameParts.length >= 2) {
-            const lastTwoExtensions = filenameParts.slice(-2).join('.').toLowerCase();
-            const dangerousPatterns = [
-                '.php', '.exe', '.bat', '.cmd', '.com', '.scr', '.vbs',
-                '.js', '.jar', '.sh', '.app', '.msi', '.dll'
-            ];
-
-            // Cek apakah ada ekstensi berbahaya sebelum ekstensi yang valid
-            const secondLastExtension = filenameParts.length > 2 ? '.' + filenameParts[filenameParts.length - 2].toLowerCase() : '';
-            if (dangerousPatterns.includes(secondLastExtension)) {
-                setFileError('Nama file tidak valid (terdeteksi ekstensi berbahaya)');
-                e.target.value = ''; // Reset input file
-                return;
-            }
-        }
-
-        // 3. Validasi MIME type (strict - hanya yang valid)
-        const allowedMimeTypes = ['image/jpeg', 'image/png', 'application/pdf'];
-        if (!allowedMimeTypes.includes(file.type)) {
-            setFileError('Tipe file tidak valid. Gunakan JPG, PNG, atau PDF asli');
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // 4. Cross-check: pastikan ekstensi sesuai dengan MIME type
-        const mimeExtensionMap: { [key: string]: string[] } = {
-            'image/jpeg': ['jpg', 'jpeg'],
-            'image/png': ['png'],
-            'application/pdf': ['pdf']
-        };
-
-        const expectedExtensions = mimeExtensionMap[file.type];
-        if (!expectedExtensions || !expectedExtensions.includes(extension)) {
-            setFileError('Ekstensi file tidak sesuai dengan tipe file');
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // 5. Validasi ukuran file (max 5MB)
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        if (file.size > maxSize) {
-            const fileSizeMB = (file.size / (1024 * 1024)).toFixed(2);
-            setFileError(`Ukuran file terlalu besar (${fileSizeMB}MB). Maksimal 5MB`);
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // 6. Validasi ukuran minimum (cegah file kosong/corrupt)
-        const minSize = 1024; // 1KB minimum
-        if (file.size < minSize) {
-            setFileError('File terlalu kecil atau rusak');
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // 7. Validasi nama file (cegah karakter berbahaya)
-        const dangerousChars = /[<>:"|?*\x00-\x1f]/;
-        if (dangerousChars.test(file.name)) {
-            setFileError('Nama file mengandung karakter tidak valid');
-            e.target.value = ''; // Reset input file
-            return;
-        }
-
-        // Semua validasi lolos - simpan file
-        setFormData({
-            ...formData,
-            paymentProof: file
-        });
-        setFileName(file.name);
-
-        // BACKGROUND COMPRESSION
-        // Immediately start compressing the image so it's ready by the time user clicks submit
-        if (file.type.startsWith('image/')) {
-            compressImage(file, 0.8, 1280) // Optimized: 0.8MB max, 1280px max width (faster)
-                .then(result => {
-                    setCompressedFile(result);
-                })
-                .catch(err => {
-                    console.warn('Background compression failed:', err);
-                    // If background fails, we'll try again on submit or use original
-                });
-        } else {
-            // PDFs don't need compression
-            setCompressedFile(file);
-        }
-    };
-
-    const handleRemoveFile = () => {
-        // Reset file input
-        const fileInput = document.getElementById('paymentProof') as HTMLInputElement;
-        if (fileInput) {
-            fileInput.value = '';
-        }
-
-        // Reset state
-        setFormData({
-            ...formData,
-            paymentProof: null
-        });
-        setFileError('');
-        setFileName('');
-        setCompressedFile(null);
     };
 
     return (
         <>
-            {/* Validation Dialog - Rendered at top level */}
             <ValidationDialog
                 isOpen={showDialog}
                 onConfirm={handleConfirmSubmit}
                 onCancel={() => setShowDialog(false)}
             />
 
-            <section className="py-20 bg-gradient-to-b from-white to-gray-50">
+            <section className="py-20 bg-gradient-to-b from-white to-gray-50 min-h-screen">
                 <div className="container-custom">
                     <div className="max-w-2xl mx-auto">
+
                         {/* Header */}
                         <motion.div
                             initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            className="text-center mb-12"
+                            animate={{ opacity: 1, y: 0 }}
+                            className="text-center mb-8"
                         >
-                            <h2 className="mb-4">Daftar Sebagai Relawan</h2>
-                            <p className="text-lg text-[--color-secondary]">
-                                Isi formulir di bawah ini untuk bergabung dengan kami
-                            </p>
+                            <h2 className="mb-2">Pendaftaran Volunteer</h2>
+                            <p className="text-gray-500">Langkah {currentStep} dari 3</p>
+
+                            {/* Progress Bar */}
+                            <div className="w-full bg-gray-200 h-2 rounded-full mt-4 overflow-hidden">
+                                <motion.div
+                                    className="h-full bg-black"
+                                    initial={{ width: '33%' }}
+                                    animate={{ width: `${(currentStep / 3) * 100}%` }}
+                                    transition={{ duration: 0.3 }}
+                                />
+                            </div>
                         </motion.div>
 
-                        {/* Form Card */}
                         <motion.div
-                            initial={{ opacity: 0, y: 30 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.2 }}
-                            className="bg-white rounded-3xl shadow-xl p-8 md:p-10"
+                            ref={formRef}
+                            className="bg-white rounded-3xl shadow-xl p-6 md:p-10 border border-gray-100"
+                            initial={{ opacity: 0, y: 20 }}
+                            animate={{ opacity: 1, y: 0 }}
                         >
                             {isSubmitted ? (
-                                <motion.div
-                                    initial={{ scale: 0.9, opacity: 0 }}
-                                    animate={{ scale: 1, opacity: 1 }}
-                                    className="text-center py-12"
-                                >
+                                <div className="text-center py-12">
                                     <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
                                         <CheckCircle2 size={40} className="text-green-600" />
                                     </div>
                                     <h3 className="mb-3">Pendaftaran Berhasil!</h3>
-                                    <p className="text-[--color-secondary]">
-                                        Tim kami akan menghubungi Anda dalam 3-5 hari kerja
-                                    </p>
-                                </motion.div>
+                                    <p className="text-gray-500">Terima kasih telah mendaftar.</p>
+                                </div>
                             ) : (
                                 <form onSubmit={handleSubmit} className="space-y-6">
-                                    {/* Name */}
-                                    <div>
-                                        <label htmlFor="name" className="block text-sm font-medium text-black mb-2">
-                                            Nama Lengkap <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            id="name"
-                                            name="name"
-                                            value={formData.name}
-                                            onChange={handleChange}
-                                            required
-                                            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition-all text-black placeholder:text-gray-400 ${validationErrors.name ? 'border-red-500' : 'border-gray-200'}`}
-                                            placeholder="Masukkan nama lengkap"
-                                        />
-                                        {validationErrors.name && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{validationErrors.name}</p>
-                                        )}
-                                    </div>
 
-                                    {/* Email */}
-                                    <div>
-                                        <label htmlFor="email" className="block text-sm font-medium text-black mb-2">
-                                            Email <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="email"
-                                            id="email"
-                                            name="email"
-                                            value={formData.email}
-                                            onChange={handleChange}
-                                            required
-                                            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition-all text-black placeholder:text-gray-400 ${validationErrors.email ? 'border-red-500' : 'border-gray-200'}`}
-                                            placeholder="email@example.com"
-                                        />
-                                        {validationErrors.email && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{validationErrors.email}</p>
-                                        )}
-                                    </div>
+                                    {/* ----- STEP 1: DATA DIRI ----- */}
+                                    {currentStep === 1 && (
+                                        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+                                            <h3 className="text-xl font-semibold mb-4">Informasi Pribadi</h3>
 
-                                    {/* Phone */}
-                                    <div>
-                                        <label htmlFor="phone" className="block text-sm font-medium text-black mb-2">
-                                            No. WhatsApp <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="tel"
-                                            id="phone"
-                                            name="phone"
-                                            value={formData.phone}
-                                            onChange={handleChange}
-                                            required
-                                            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition-all text-black placeholder:text-gray-400 ${validationErrors.phone ? 'border-red-500' : 'border-gray-200'}`}
-                                            placeholder="08xxxxxxxxxx"
-                                        />
-                                        {validationErrors.phone && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{validationErrors.phone}</p>
-                                        )}
-                                    </div>
+                                            {/* Nama */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Nama Lengkap <span className="text-red-500">*</span></label>
+                                                <input type="text" name="name" value={formData.name} onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="Nama sesuai KTP" required />
+                                                <ErrorMsg msg={validationErrors.name} />
+                                            </div>
 
-                                    {/* Age */}
-                                    <div>
-                                        <label htmlFor="age" className="block text-sm font-medium text-black mb-2">
-                                            Usia <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="number"
-                                            id="age"
-                                            name="age"
-                                            value={formData.age}
-                                            onChange={handleChange}
-                                            required
-                                            min="17"
-                                            max="60"
-                                            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition-all text-black placeholder:text-gray-400 ${validationErrors.age ? 'border-red-500' : 'border-gray-200'}`}
-                                            placeholder="17"
-                                        />
-                                        {validationErrors.age && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{validationErrors.age}</p>
-                                        )}
-                                    </div>
+                                            {/* Email */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Email <span className="text-red-500">*</span></label>
+                                                <input type="email" name="email" value={formData.email} onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="email@example.com" required />
+                                                <ErrorMsg msg={validationErrors.email} />
+                                            </div>
 
-                                    {/* City */}
-                                    <div>
-                                        <label htmlFor="city" className="block text-sm font-medium text-black mb-2">
-                                            Kota Domisili <span className="text-red-500">*</span>
-                                        </label>
-                                        <input
-                                            type="text"
-                                            id="city"
-                                            name="city"
-                                            value={formData.city}
-                                            onChange={handleChange}
-                                            required
-                                            className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-[--color-primary] focus:border-transparent transition-all text-black placeholder:text-gray-400 ${validationErrors.city ? 'border-red-500' : 'border-gray-200'}`}
-                                            placeholder="Jakarta"
-                                        />
-                                        {validationErrors.city && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{validationErrors.city}</p>
-                                        )}
-                                    </div>
+                                            {/* WA */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">No. WhatsApp <span className="text-red-500">*</span></label>
+                                                <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="08xxxxxxxxxx" required />
+                                                <ErrorMsg msg={validationErrors.phone} />
+                                            </div>
 
-                                    {/* Payment Proof Upload */}
-                                    <div>
-                                        <label htmlFor="paymentProof" className="block text-sm font-medium text-black mb-2">
-                                            Bukti Pembayaran <span className="text-red-500">*</span>
-                                        </label>
-                                        <div className="relative">
-                                            <input
-                                                type="file"
-                                                id="paymentProof"
-                                                name="paymentProof"
-                                                onChange={handleFileChange}
-                                                accept=".jpg,.jpeg,.png,.pdf,image/jpeg,image/png,application/pdf"
-                                                className="hidden"
-                                            />
-                                            <motion.label
-                                                htmlFor="paymentProof"
-                                                whileHover={{ scale: 1.01, borderColor: '#9ca3af' }}
-                                                whileTap={{ scale: 0.98 }}
-                                                className={`w-full px-4 py-3 border-2 border-dashed rounded-xl transition-all cursor-pointer flex items-center justify-center gap-2 ${fileError ? 'border-red-500 bg-red-50' : fileName ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:border-gray-400 hover:bg-gray-100'}`}
-                                            >
-                                                <Upload size={20} className={fileError ? 'text-red-600' : fileName ? 'text-green-600' : 'text-black'} />
-                                                <span className={`text-sm ${fileError ? 'text-red-600' : fileName ? 'text-green-600' : 'text-black'}`}>
-                                                    {fileName || 'Upload Bukti Transfer'}
-                                                </span>
-                                            </motion.label>
-                                        </div>
-                                        {fileName && !fileError && (
-                                            <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-xl mt-2">
-                                                <div className="flex items-center gap-2">
-                                                    <CheckCircle2 size={18} className="text-green-600" />
-                                                    <span className="text-sm text-green-700">{fileName}</span>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                {/* Usia */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-black mb-2">Usia <span className="text-red-500">*</span></label>
+                                                    <input type="number" name="age" value={formData.age} onChange={handleInputChange}
+                                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="17-60" required />
+                                                    <ErrorMsg msg={validationErrors.age} />
                                                 </div>
+                                                {/* Kota */}
+                                                <div>
+                                                    <label className="block text-sm font-medium text-black mb-2">Kota <span className="text-red-500">*</span></label>
+                                                    <input type="text" name="city" value={formData.city} onChange={handleInputChange}
+                                                        className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="Jakarta" required />
+                                                    <ErrorMsg msg={validationErrors.city} />
+                                                </div>
+                                            </div>
+
+                                            {/* IG */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Akun Instagram (Aktif) <span className="text-red-500">*</span></label>
+                                                <input type="text" name="instagramUsername" value={formData.instagramUsername} onChange={handleInputChange}
+                                                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-black focus:border-transparent transition-all text-black" placeholder="@username" required />
+                                                <ErrorMsg msg={validationErrors.instagramUsername} />
+                                            </div>
+
+                                            {/* History */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Pernah ikut kegiatan Relawanns? <span className="text-red-500">*</span></label>
+                                                <CustomDropdown
+                                                    value={formData.participationHistory}
+                                                    onChange={(val) => handleInputChange({ target: { name: 'participationHistory', value: val } } as any)}
+                                                    options={[
+                                                        { value: 'Sudah Pernah', label: 'Sudah Pernah' },
+                                                        { value: 'Belum Pernah', label: 'Belum Pernah' }
+                                                    ]}
+                                                    placeholder="Pilih Jawaban"
+                                                    error={validationErrors.participationHistory || ''}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* ----- STEP 2: ATRIBUT & TASK ----- */}
+                                    {currentStep === 2 && (
+                                        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                                            <h3 className="text-xl font-semibold mb-4">Atribut & Tugas</h3>
+
+                                            {/* Vest Size */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Pilih Ukuran Vest <span className="text-red-500">*</span></label>
+
+                                                {/* Vest Image */}
+                                                <div className="flex justify-center mb-6">
+                                                    <div className="relative group">
+                                                        <div className="absolute -inset-1 bg-gradient-to-r from-gray-200 to-gray-100 rounded-3xl blur opacity-25 group-hover:opacity-50 transition duration-1000 group-hover:duration-200"></div>
+                                                        <img
+                                                            src="/img/vest.webp"
+                                                            alt="Vest Relawanns"
+                                                            style={{ width: '220px', height: 'auto' }}
+                                                            className="relative object-cover rounded-3xl shadow-2xl border-4 border-white transform transition-transform duration-500 hover:scale-[1.02]"
+                                                        />
+                                                    </div>
+                                                </div>
+
+                                                {/* Size Chart Visualization Placeholder */}
+                                                <div className="bg-gray-50 rounded-xl p-4 mb-4 border border-gray-200 text-sm md:text-base">
+                                                    <p className="font-medium mb-2 text-center">Size Chart Vest</p>
+                                                    <div className="grid grid-cols-1 gap-2 text-gray-600">
+                                                        <div className="flex justify-between border-b pb-1"><span>M</span> <span>Panjang 62 cm, Lingkar Dada 53 cm</span></div>
+                                                        <div className="flex justify-between border-b pb-1"><span>L</span> <span>Panjang 64 cm, Lingkar Dada 55 cm</span></div>
+                                                        <div className="flex justify-between"><span>XL</span> <span>Panjang 64 cm, Lingkar Dada 57 cm</span></div>
+                                                    </div>
+                                                </div>
+
+                                                <CustomDropdown
+                                                    value={formData.vestSize}
+                                                    onChange={(val) => handleInputChange({ target: { name: 'vestSize', value: val } } as any)}
+                                                    options={[
+                                                        { value: 'M', label: 'M — Panjang 62 cm, Lingkar Dada 53 cm' },
+                                                        { value: 'L', label: 'L — Panjang 64 cm, Lingkar Dada 55 cm' },
+                                                        { value: 'XL', label: 'XL — Panjang 64 cm, Lingkar Dada 57 cm' }
+                                                    ]}
+                                                    placeholder="Pilih Ukuran"
+                                                    error={validationErrors.vestSize || ''}
+                                                />
+                                            </div>
+
+                                            <div className="border-t border-gray-100 my-4 pt-4"></div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* ----- STEP 3: FINALISASI ----- */}
+                                    {currentStep === 3 && (
+                                        <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                                            <h3 className="text-xl font-semibold mb-4">Pembayaran & Finalisasi</h3>
+
+                                            {/* Summary */}
+                                            <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 space-y-2 mb-6">
+                                                <p><span className="font-semibold">Nama:</span> {formData.name}</p>
+                                                <p><span className="font-semibold">Email:</span> {formData.email}</p>
+                                                <p><span className="font-semibold">Vest:</span> {formData.vestSize} (Size)</p>
+                                            </div>
+
+                                            {/* TikTok Proof */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1">1. Follow TikTok Kami <span className="text-red-500">*</span></label>
+                                                <a href="https://www.tiktok.com/@relawanns" target="_blank" rel="noreferrer" className="text-blue-600 text-sm hover:underline mb-3 inline-block font-medium">
+                                                    Klik disini: tiktok.com/@relawanns
+                                                </a>
+                                                <p className="text-xs text-gray-500 mb-2">Upload bukti follow (screenshot)</p>
+                                                <FileUpload
+                                                    id="tiktokProof"
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e, 'tiktokProof')}
+                                                    fileName={fileNames.tiktok}
+                                                    error={fileErrors.tiktok}
+                                                    onRemove={() => removeFile('tiktokProof')}
+                                                />
+                                            </div>
+
+                                            {/* IG Proof */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-1">2. Follow Instagram Kami <span className="text-red-500">*</span></label>
+                                                <p className="text-sm text-gray-600 mb-3">@relawanns</p>
+                                                <p className="text-xs text-gray-500 mb-2">Upload bukti follow (screenshot)</p>
+                                                <FileUpload
+                                                    id="instagramProof"
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e, 'instagramProof')}
+                                                    fileName={fileNames.instagram}
+                                                    error={fileErrors.instagram}
+                                                    onRemove={() => removeFile('instagramProof')}
+                                                />
+                                            </div>
+
+                                            {/* Payment Proof */}
+                                            <div>
+                                                <label className="block text-sm font-medium text-black mb-2">Upload Bukti Pembayaran <span className="text-red-500">*</span></label>
+                                                <FileUpload
+                                                    id="paymentProof"
+                                                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleFileChange(e, 'paymentProof')}
+                                                    fileName={fileNames.payment}
+                                                    error={fileErrors.payment}
+                                                    onRemove={() => removeFile('paymentProof')}
+                                                />
+                                            </div>
+                                        </motion.div>
+                                    )}
+
+                                    {/* Navigation Buttons */}
+                                    {/* Navigation Buttons */}
+                                    <div className="flex items-center justify-between pt-8 mt-4 border-t border-gray-100">
+                                        <div>
+                                            {currentStep > 1 && (
                                                 <button
                                                     type="button"
-                                                    onClick={handleRemoveFile}
-                                                    className="text-red-500 hover:text-red-700 transition-colors"
+                                                    onClick={prevStep}
+                                                    disabled={isSubmitting}
+                                                    className="px-6 py-2.5 rounded-full border border-gray-200 text-red-600 font-medium hover:bg-red-50 transition-all flex items-center gap-2 group"
                                                 >
-                                                    <X size={18} />
+                                                    <ChevronLeft size={18} className="group-hover:-translate-x-1 transition-transform" />
+                                                    Kembali
                                                 </button>
-                                            </div>
-                                        )}
-                                        {fileError && (
-                                            <p className="text-xs mt-2 font-medium" style={{ color: '#dc2626' }}>{fileError}</p>
-                                        )}
-                                        <p className="text-xs text-gray-500 mt-2">
-                                            Upload bukti transfer atau pembayaran dalam format JPG, PNG, atau PDF (maksimal 2MB)
-                                        </p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            {currentStep < 3 && (
+                                                <button
+                                                    type="button"
+                                                    onClick={nextStep}
+                                                    className="px-8 py-2.5 rounded-full bg-black text-white font-medium hover:bg-gray-900 transition-all flex items-center gap-2 shadow-md hover:shadow-lg group"
+                                                >
+                                                    Lanjut
+                                                    <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+                                                </button>
+                                            )}
+                                        </div>
                                     </div>
 
-                                    {/* Submit Button */}
-                                    <div className="flex justify-center">
-                                        {!registrationOpen && !statusLoading ? (
-                                            <div className="w-full max-w-xs">
-                                                <div className="py-4 px-6 rounded-xl font-semibold text-center bg-red-100 text-red-700 border-2 border-red-300">
-                                                    Pendaftaran Ditutup
-                                                </div>
-                                                <p className="text-sm text-center text-gray-600 mt-3">
-                                                    Pendaftaran saat ini sedang ditutup. Silakan cek kembali nanti.
-                                                </p>
-                                            </div>
-                                        ) : (
-                                            <motion.button
+                                    {/* Submit Button (Only Step 3) - Full width below nav */}
+                                    {currentStep === 3 && (
+                                        <div className="mt-6">
+                                            <button
                                                 type="submit"
-                                                disabled={isSubmitting || statusLoading || !registrationOpen}
-                                                whileHover={!isSubmitting && registrationOpen && !statusLoading ? { scale: 1.02 } : undefined}
-                                                whileTap={!isSubmitting && registrationOpen && !statusLoading ? { scale: 0.98 } : undefined}
-                                                className={`w-full max-w-xs py-4 rounded-xl font-semibold flex items-center justify-center gap-2 shadow-lg transition-all ${(isSubmitting || statusLoading || !registrationOpen)
-                                                    ? 'bg-gray-400 cursor-not-allowed'
-                                                    : 'bg-black hover:bg-gray-800 hover:shadow-xl'
-                                                    } text-white`}
+                                                disabled={!registrationOpen || isSubmitting}
+                                                style={{ backgroundColor: (!registrationOpen || isSubmitting) ? '#9ca3af' : '#000000', color: '#ffffff' }}
+                                                className={`w-full py-4 rounded-xl font-bold text-lg transition-all shadow-lg hover:shadow-xl transform hover:-translate-y-1 ${(!registrationOpen || isSubmitting) ? 'cursor-not-allowed' : ''}`
+                                                }
                                             >
-                                                {statusLoading ? (
-                                                    'Memuat...'
-                                                ) : isSubmitting ? (
-                                                    <>
-                                                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                                                        {statusMessage}
-                                                    </>
-                                                ) : (
-                                                    'Daftar'
-                                                )}
-                                            </motion.button>
-                                        )}
-                                    </div>
+                                                {isSubmitting ? 'Memproses...' : 'Kirim Pendaftaran'}
+                                            </button>
+                                        </div>
+                                    )}
 
-                                    {/* Privacy Notice */}
-                                    <p className="text-xs text-center text-[--color-secondary] mt-4">
-                                        Data Anda akan dijaga kerahasiaannya dan hanya digunakan untuk keperluan pendaftaran relawan
-                                    </p>
                                 </form>
                             )}
-                        </motion.div>
-
-                        {/* Info Card */}
-                        <motion.div
-                            initial={{ opacity: 0, y: 20 }}
-                            whileInView={{ opacity: 1, y: 0 }}
-                            viewport={{ once: true }}
-                            transition={{ delay: 0.3 }}
-                            className="mt-8 bg-blue-50 rounded-2xl p-6"
-                        >
-                            <div className="flex items-start gap-4">
-                                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                                    <Clock size={20} className="text-blue-600" />
-                                </div>
-                                <div>
-                                    <h4 className="font-semibold mb-2">Proses Selanjutnya</h4>
-                                    <p className="text-sm text-[--color-secondary]">
-                                        Setelah mendaftar, tim kami akan memverifikasi data Anda dan mengundang Anda ke grub WhatsApp. pastikan nomor yang anda masukkan benar.
-                                    </p>
-                                </div>
-                            </div>
                         </motion.div>
                     </div>
                 </div>
@@ -690,5 +685,37 @@ const Form = () => {
         </>
     );
 };
+
+// Sub-components for cleaner code
+const ErrorMsg = ({ msg }: { msg: string }) => (
+    msg ? <p className="text-xs mt-1 text-red-600 font-medium flex items-center gap-1"><AlertCircle size={12} /> {msg}</p> : null
+);
+
+interface FileUploadProps {
+    id: string;
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+    fileName: string;
+    error: string;
+    onRemove: () => void;
+}
+
+const FileUpload = ({ id, onChange, fileName, error, onRemove }: FileUploadProps) => (
+    <div className="relative">
+        <input type="file" id={id} onChange={onChange} accept=".jpg,.jpeg,.png,.pdf,image/*" className="hidden" />
+        <label htmlFor={id} className={`w-full px-4 py-8 border-2 border-dashed rounded-xl cursor-pointer flex flex-col items-center justify-center gap-2 text-center transition-all ${error ? 'border-red-500 bg-red-50' : fileName ? 'border-green-500 bg-green-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100'
+            }`}>
+            <Upload size={24} className={error ? 'text-red-500' : fileName ? 'text-green-600' : 'text-gray-400'} />
+            <span className={`text-sm font-medium ${error ? 'text-red-600' : fileName ? 'text-green-600' : 'text-gray-600'}`}>
+                {fileName || 'Klik untuk upload file'}
+            </span>
+        </label>
+        {fileName && !error && (
+            <button type="button" onClick={onRemove} className="absolute top-2 right-2 p-1 bg-white rounded-full shadow border hover:bg-gray-100">
+                <X size={14} className="text-red-500" />
+            </button>
+        )}
+        <ErrorMsg msg={error} />
+    </div>
+);
 
 export default Form;

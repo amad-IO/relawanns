@@ -1,9 +1,10 @@
 // Netlify Function: Registration Handler
-// Handles form submission, file upload, database storage, and Telegram notification
+// Handles form submission, file upload, database storage, Google Sheets/Drive, and Telegram notification
 
 const postgres = require('postgres');
 const { createClient } = require('@supabase/supabase-js');
 const Busboy = require('busboy');
+const { getOrCreateSheet, appendToSheet, uploadToDrive, getOrCreateFolder } = require('./utils/google');
 
 exports.handler = async function (event, context) {
   // Only allow POST
@@ -74,10 +75,18 @@ exports.handler = async function (event, context) {
     const phone = formData.fields.phone;
     const age = formData.fields.age;
     const city = formData.fields.city;
+
+    // New Fields
+    const participationHistory = formData.fields.participationHistory;
+    const vestSize = formData.fields.vestSize;
+    const instagramUsername = formData.fields.instagramUsername;
+
     const paymentProofFile = formData.files.paymentProof;
+    const tiktokProofFile = formData.files.tiktokProof;
+    const instagramProofFile = formData.files.instagramProof;
 
     // Validate required fields
-    if (!name || !email || !phone || !age || !city || !paymentProofFile) {
+    if (!name || !email || !phone || !age || !city || !paymentProofFile || !vestSize || !instagramUsername) {
       return {
         statusCode: 400,
         headers: {
@@ -86,7 +95,7 @@ exports.handler = async function (event, context) {
         },
         body: JSON.stringify({
           success: false,
-          error: 'Semua field harus diisi termasuk bukti pembayaran'
+          error: 'Semua field wajib diisi (termasuk bukti pembayaran, vest, dan instagram)'
         })
       };
     }
@@ -98,18 +107,22 @@ exports.handler = async function (event, context) {
       connect_timeout: 10,
     });
 
-    // Get current registration number and max quota
+    // Get current registration number, max quota, and event details
     const [registrationData] = await sql`
       SELECT 
         COALESCE(MAX(registration_number), 0) + 1 as next_number,
         (SELECT value::int FROM event_settings WHERE key = 'max_quota') as max_quota,
-        (SELECT value::int FROM event_settings WHERE key = 'current_registrants') as current_count
+        (SELECT value::int FROM event_settings WHERE key = 'current_registrants') as current_count,
+        (SELECT value FROM event_settings WHERE key = 'event_title') as event_title,
+        (SELECT value FROM event_settings WHERE key = 'event_date') as event_date
       FROM registrations
     `;
 
     const registrationNumber = registrationData.next_number;
     const maxQuota = registrationData.max_quota || 0;
     const currentCount = registrationData.current_count || 0;
+    const eventTitle = registrationData.event_title || 'Event Relawanns';
+    const eventDate = registrationData.event_date || '2026-01-01';
 
     // Check if registration is full
     if (currentCount >= maxQuota) {
@@ -127,41 +140,106 @@ exports.handler = async function (event, context) {
       };
     }
 
-    // Upload file to Supabase Storage
+    // Initialize Supabase
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // File already in buffer from busboy
-    const fileBuffer = paymentProofFile.buffer;
-    const fileExt = paymentProofFile.filename.split('.').pop();
-    const fileName = `payment_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+    // Helper to upload file
+    const uploadFile = async (file, folder = 'payment-proofs') => {
+      if (!file) return null;
 
-    // Upload to storage
-    const { data: uploadData, error: uploadError } = await supabase.storage
-      .from('payment-proofs')
-      .upload(fileName, fileBuffer, {
-        contentType: paymentProofFile.mimeType,
-        cacheControl: '3600',
-        upsert: false
-      });
+      const fileExt = file.filename.split('.').pop();
+      const fileName = `${folder}_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
 
-    if (uploadError) {
-      await sql.end();
-      throw new Error(`Failed to upload file: ${uploadError.message}`);
+      const { data, error } = await supabase.storage
+        .from('payment-proofs') // Using same bucket for simplicity
+        .upload(fileName, file.buffer, {
+          contentType: file.mimeType,
+          cacheControl: '3600',
+          upsert: false
+        });
+
+      if (error) throw new Error(`Upload failed: ${error.message}`);
+
+      const { data: publicData } = supabase.storage
+        .from('payment-proofs')
+        .getPublicUrl(fileName);
+
+      return publicData.publicUrl;
+    };
+
+    // Upload ONLY Payment Proof to Supabase (keeping as backup)
+    const paymentProofUrl = await uploadFile(paymentProofFile, 'payment');
+
+    // === GOOGLE WORKSPACE INTEGRATION ===
+    // Generate sheet/folder name based on event
+    const sheetFolderName = `${eventTitle} - ${eventDate}`;
+
+    try {
+      // 1. Create or get event-specific folder in Google Drive
+      const eventFolderId = await getOrCreateFolder(sheetFolderName);
+
+      // 2. Upload files to Google Drive
+      const paymentDriveLink = await uploadToDrive(
+        paymentProofFile.buffer,
+        `payment_${name}_${Date.now()}.${paymentProofFile.filename.split('.').pop()}`,
+        paymentProofFile.mimeType,
+        eventFolderId
+      );
+
+      const tiktokDriveLink = tiktokProofFile ? await uploadToDrive(
+        tiktokProofFile.buffer,
+        `tiktok_${name}_${Date.now()}.${tiktokProofFile.filename.split('.').pop()}`,
+        tiktokProofFile.mimeType,
+        eventFolderId
+      ) : 'Tidak ada';
+
+      const instagramDriveLink = instagramProofFile ? await uploadToDrive(
+        instagramProofFile.buffer,
+        `instagram_${name}_${Date.now()}.${instagramProofFile.filename.split('.').pop()}`,
+        instagramProofFile.mimeType,
+        eventFolderId
+      ) : 'Tidak ada';
+
+      // 3. Create or get the sheet for this event
+      await getOrCreateSheet(sheetFolderName);
+
+      // 4. Append data to Google Sheets
+      const rowData = [
+        name,
+        email,
+        phone,
+        age,
+        city,
+        instagramUsername,
+        participationHistory || 'Belum Pernah',
+        vestSize,
+        paymentDriveLink,
+        tiktokDriveLink,
+        instagramDriveLink
+      ];
+
+      await appendToSheet(sheetFolderName, rowData);
+      console.log(`✅ Data written to Google Sheet: ${sheetFolderName}`);
+
+    } catch (googleError) {
+      console.error('Google Workspace error:', googleError);
+      // Continue execution even if Google integration fails (PostgreSQL is still saved)
     }
-
-    // Get public URL
-    const { data: publicData } = supabase.storage
-      .from('payment-proofs')
-      .getPublicUrl(fileName);
-
-    const paymentProofUrl = publicData.publicUrl;
+    // === END GOOGLE WORKSPACE INTEGRATION ===
 
     // Insert registration data
+    // tiktok_proof_url and instagram_proof_url are set to NULL as requested
     await sql`
       INSERT INTO registrations (
-        name, email, phone, age, city, payment_proof_url, registration_number
+        name, email, phone, age, city, 
+        payment_proof_url, registration_number,
+        participation_history, vest_size, instagram_username,
+        tiktok_proof_url, instagram_proof_url
       ) VALUES (
-        ${name}, ${email}, ${phone}, ${parseInt(age)}, ${city}, ${paymentProofUrl}, ${registrationNumber}
+        ${name}, ${email}, ${phone}, ${parseInt(age)}, ${city}, 
+        ${paymentProofUrl}, ${registrationNumber},
+        ${participationHistory || 'Belum Pernah'}, ${vestSize}, ${instagramUsername},
+        NULL, NULL
       )
     `;
 
@@ -178,7 +256,6 @@ exports.handler = async function (event, context) {
 
     if (newCount >= maxQuota) {
       isQuotaFull = true;
-      // Auto-close registration
       await sql`
         UPDATE event_settings 
         SET value = 'closed'
@@ -189,34 +266,35 @@ exports.handler = async function (event, context) {
     await sql.end();
 
     // Send Telegram notification
-    console.log(`[Env Debug] BOT_TOKEN exists: ${!!BOT_TOKEN}`);
-    console.log(`[Env Debug] CHAT_ID exists: ${!!CHAT_ID}, Value: ${CHAT_ID}`);
-
     if (BOT_TOKEN && CHAT_ID) {
+      const FormData = require('form-data');
+
       try {
         const telegramMessage = `🆕 *PENDAFTAR BARU!*
 
 No. Pendaftar: *${registrationNumber} / ${maxQuota}*
 ━━━━━━━━━━━━━━━━━
-👤 Nama: ${name}
-📧 Email: ${email}
-📱 WhatsApp: ${phone}
-🎂 Usia: ${age} tahun
-🏙️ Kota: ${city}
-━━━━━━━━━━━━━━━━━
-📅 Waktu: ${new Date().toLocaleString('id-ID')}`;
+👤 *DATA DIRI*
+Nama: ${name}
+Email: ${email}
+WA: ${phone}
+Usia: ${age} th | Kota: ${city}
+IG: [${instagramUsername}](https://instagram.com/${instagramUsername.replace('@', '')})
+History: ${participationHistory || '-'}
 
-        // Support multiple chat IDs (comma-separated)
-        // Format: "8278108288,1234567890,9876543210"
+👕 *ATRIBUT*
+Ukuran Vest: *${vestSize}*
+
+📎 *LAMPIRAN*
+• [Bukti Bayar (Link)](${paymentProofUrl})
+━━━━━━━━━━━━━━━━━
+📅 ${new Date().toLocaleString('id-ID')}`;
+
         const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
 
-        console.log(`[Telegram Debug] Attempting to send to ${chatIds.length} chat(s). IDs: ${chatIds.join(', ')}`);
-        if (!BOT_TOKEN) console.error('[Telegram Debug] BOT_TOKEN is missing!');
-
-        // Send to each chat ID
         for (const chatId of chatIds) {
           try {
-            // Send photo with caption (Single Bubble, with Smart Retry)
+            // 1. Send Main Message with Payment Proof
             await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -227,18 +305,20 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
                 parse_mode: 'Markdown'
               })
             });
+
           } catch (singleChatError) {
             console.error(`Failed to send to chat ${chatId}:`, singleChatError);
-            // Continue sending to other chats even if one fails
           }
         }
       } catch (telegramError) {
         console.error('Telegram notification failed:', telegramError);
-        // Don't fail the registration if Telegram fails
       }
 
       // Special Notification if Quota Full
       if (isQuotaFull) {
+        // ... (existing quota logic omitted for brevity, logic remains same if I don't touch it, but I need to make sure I don't delete it inadvertently)
+        // Actually I'm replacing until line 288, so I need to include the quota logic or end the replacement usage carefully.
+        // Let's include the quota logic in the replacement content to be safe.
         try {
           const quotaMessage = `🚨 *KUOTA TERPENUHI!*\n\n` +
             `Pendaftaran otomatis DITUTUP sistem.\n` +
@@ -246,7 +326,7 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
 
           const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
           for (const chatId of chatIds) {
-            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
@@ -256,9 +336,7 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
               })
             });
           }
-        } catch (e) {
-          console.error('Failed to send quota notification', e);
-        }
+        } catch (e) { console.error('Quota notify error', e); }
       }
     }
 
@@ -315,4 +393,3 @@ async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
     throw error;
   }
 }
-
