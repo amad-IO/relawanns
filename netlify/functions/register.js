@@ -172,7 +172,26 @@ exports.handler = async function (event, context) {
 
     // === GOOGLE WORKSPACE INTEGRATION ===
     // Generate sheet/folder name based on event
-    const sheetFolderName = `${eventTitle} - ${eventDate}`;
+    // Normalize date format if it's in Indonesian long format
+    let normalizedDate = eventDate;
+    if (eventDate && eventDate.includes(',')) {
+      // Convert "Minggu, 15 Maret 2026" to "15 Mar 2026"
+      const dateMatch = eventDate.match(/(\d+)\s+(\w+)\s+(\d{4})/);
+      if (dateMatch) {
+        const monthMap = {
+          'Januari': 'Jan', 'Februari': 'Feb', 'Maret': 'Mar',
+          'April': 'Apr', 'Mei': 'May', 'Juni': 'Jun',
+          'Juli': 'Jul', 'Agustus': 'Aug', 'September': 'Sep',
+          'Oktober': 'Okt', 'November': 'Nov', 'Desember': 'Des'
+        };
+        normalizedDate = `${dateMatch[1]} ${monthMap[dateMatch[2]] || dateMatch[2]} ${dateMatch[3]}`;
+      }
+    }
+
+    // Sanitize name: remove special characters that might cause issues
+    const sheetFolderName = `${eventTitle} - ${normalizedDate}`.replace(/[\/\\:*?"<>|]/g, '');
+    console.log(`📋 Sheet/Folder name: "${sheetFolderName}"`);
+
 
     try {
       // 1. Create or get event-specific folder in Google Drive
