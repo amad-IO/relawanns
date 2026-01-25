@@ -183,6 +183,7 @@ async function uploadToDrive(fileBuffer, fileName, mimeType, parentFolderId = nu
       requestBody: fileMetadata,
       media: media,
       fields: 'id, webViewLink',
+      supportsAllDrives: true,
     });
 
     const fileId = response.data.id;
@@ -194,6 +195,7 @@ async function uploadToDrive(fileBuffer, fileName, mimeType, parentFolderId = nu
         role: 'reader',
         type: 'anyone',
       },
+      supportsAllDrives: true,
     });
 
     console.log(`File uploaded: ${fileName} (${fileId})`);
@@ -222,6 +224,8 @@ async function getOrCreateFolder(folderName, parentFolderId = DRIVE_FOLDER_ID) {
       q: query,
       fields: 'files(id, name)',
       spaces: 'drive',
+      supportsAllDrives: true,
+      includeItemsFromAllDrives: true,
     });
 
     if (response.data.files.length > 0) {
@@ -240,6 +244,7 @@ async function getOrCreateFolder(folderName, parentFolderId = DRIVE_FOLDER_ID) {
     const folder = await drive.files.create({
       requestBody: folderMetadata,
       fields: 'id',
+      supportsAllDrives: true,
     });
 
     return folder.data.id;
