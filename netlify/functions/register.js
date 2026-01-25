@@ -207,6 +207,9 @@ No. Pendaftar: *${registrationNumber} / ${maxQuota}*
         // Format: "8278108288,1234567890,9876543210"
         const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
 
+        console.log(`[Telegram Debug] Attempting to send to ${chatIds.length} chat(s). IDs: ${chatIds.join(', ')}`);
+        if (!BOT_TOKEN) console.error('[Telegram Debug] BOT_TOKEN is missing!');
+
         // Send to each chat ID
         for (const chatId of chatIds) {
           try {
