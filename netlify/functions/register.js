@@ -1,10 +1,10 @@
 // Netlify Function: Registration Handler
-// Handles form submission, file upload, database storage, Google Sheets/Drive, and Telegram notification
+// Handles form submission, file upload, database storage, Google Sheets/Drive (OAuth), and Telegram notification
 
 const postgres = require('postgres');
 const { createClient } = require('@supabase/supabase-js');
 const Busboy = require('busboy');
-const { getOrCreateSheet, appendToSheet, uploadToDrive, getOrCreateFolder } = require('./utils/google');
+const { getOrCreateSheet, appendToSheet, uploadToDrive, getOrCreateFolder } = require('./utils/oauth-google');
 
 exports.handler = async function (event, context) {
   // Only allow POST
