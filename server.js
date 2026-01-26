@@ -64,11 +64,11 @@ app.get('/.netlify/functions/get-event-details', wrapNetlifyFunction(getEventDet
 app.get('/.netlify/functions/check-status', wrapNetlifyFunction(checkStatusHandler));
 
 // Serve static files (Vite build)
-app.use(express.static(path.join(__dirname, 'dist')));
+app.use(express.static(path.join(__dirname, 'build'), { maxAge: '1d' }));
 
-// SPA fallback - serve index.html for all other routes
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+// SPA fallback - serve index.html for all other routes (must be last!)
+app.use((req, res) => {
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 // Error handling
