@@ -339,15 +339,17 @@ Ukuran Vest: *${vestSize}*
 
         for (const chatId of chatIds) {
           try {
-            // 1. Send Main Message with Payment Proof
-            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendPhoto`, {
+            // Send notification message with payment proof link
+            // NOTE: Using sendMessage instead of sendPhoto because Google Drive webViewLink
+            // (https://drive.google.com/file/d/.../view) is not a direct image URL
+            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 chat_id: chatId,
-                photo: paymentProofUrl,
-                caption: telegramMessage,
-                parse_mode: 'Markdown'
+                text: telegramMessage,
+                parse_mode: 'Markdown',
+                disable_web_page_preview: false  // Show link preview
               })
             });
 
