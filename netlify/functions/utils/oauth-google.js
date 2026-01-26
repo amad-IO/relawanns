@@ -73,6 +73,9 @@ async function getOrCreateSheet(sheetName) {
             addSheet: {
               properties: {
                 title: sheetName,
+                gridProperties: {
+                  frozenRowCount: 1, // Freeze header row
+                },
               },
             },
           },
@@ -107,7 +110,58 @@ async function getOrCreateSheet(sheetName) {
       },
     });
 
-    console.log(`✅ Header row added to sheet "${sheetName}"`);
+    // Apply beautiful formatting to header row
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: SPREADSHEET_ID,
+      requestBody: {
+        requests: [
+          // 1. Set header background to purple and text to white + bold
+          {
+            repeatCell: {
+              range: {
+                sheetId: newSheetId,
+                startRowIndex: 0,
+                endRowIndex: 1,
+              },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: {
+                    red: 0.416, // Purple color #6A1B9A
+                    green: 0.106,
+                    blue: 0.604,
+                  },
+                  textFormat: {
+                    foregroundColor: {
+                      red: 1.0,
+                      green: 1.0,
+                      blue: 1.0,
+                    },
+                    fontSize: 10,
+                    bold: true,
+                  },
+                  horizontalAlignment: 'LEFT',
+                  verticalAlignment: 'MIDDLE',
+                },
+              },
+              fields: 'userEnteredFormat(backgroundColor,textFormat,horizontalAlignment,verticalAlignment)',
+            },
+          },
+          // 2. Auto-resize all columns
+          {
+            autoResizeDimensions: {
+              dimensions: {
+                sheetId: newSheetId,
+                dimension: 'COLUMNS',
+                startIndex: 0,
+                endIndex: headerRow.length,
+              },
+            },
+          },
+        ],
+      },
+    });
+
+    console.log(`✅ Sheet "${sheetName}" created with beautiful purple header!`);
     return newSheetId;
   } catch (error) {
     console.error('❌ Error in getOrCreateSheet:', error);
