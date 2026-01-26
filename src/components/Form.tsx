@@ -385,18 +385,9 @@ const Form = () => {
             setIsSubmitted(true);
             setIsSubmitting(false);
 
-            // Reset after delay
-            setTimeout(() => {
-                setIsSubmitted(false);
-                setCurrentStep(1);
-                setFormData({
-                    name: '', email: '', phone: '', age: '', city: '',
-                    instagramUsername: '', participationHistory: '', vestSize: '',
-                    tiktokProof: null, instagramProof: null, paymentProof: null
-                });
-                setFileNames({ payment: '', tiktok: '', instagram: '' });
-                setFileErrors({ payment: '', tiktok: '', instagram: '' });
-            }, 3000);
+            // ❌ REMOVED: Auto-reset form after 3 seconds
+            // Form will stay filled until user manually refreshes the page
+            // This allows user to review their submitted data
 
         } catch (error: any) {
             console.error('Submission error:', error);
