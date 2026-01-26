@@ -7,6 +7,8 @@ import Beranda from './pages/Beranda';
 import TentangKami from './pages/TentangKami';
 import Galeri from './pages/Galeri';
 import Daftar from './pages/Daftar';
+import Maintenance from './pages/Maintenance';
+import NotFound from './pages/NotFound';
 
 function ScrollToTop() {
     const { pathname } = useLocation();
@@ -34,6 +36,9 @@ function App() {
                         <Route path="/about" element={<TentangKami />} />
                         <Route path="/gallery" element={<Galeri />} />
                         <Route path="/daftar" element={<Daftar />} />
+                        <Route path="/maintenance" element={<Maintenance />} />
+                        {/* 404 catch-all route */}
+                        <Route path="*" element={<NotFound />} />
                     </Routes>
                 </main>
                 <Footer />

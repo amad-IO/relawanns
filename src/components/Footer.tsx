@@ -11,15 +11,16 @@ const TikTokIcon = ({ className }: { className?: string }) => (
 
 const Footer = () => {
     const socialLinks = [
-        { icon: Instagram, url: '#', label: 'Instagram' },
-        { icon: TikTokIcon, url: '#', label: 'TikTok' },
+        { icon: Instagram, url: 'https://www.instagram.com/relawanns', label: 'Instagram' },
+        { icon: TikTokIcon, url: 'https://www.tiktok.com/@relawanns', label: 'TikTok' },
     ];
 
     return (
         <footer className="pb-6 md:py-12" style={{
             borderTop: '1px solid var(--color-primary-light)',
             backgroundColor: 'var(--color-pink-50)',
-            paddingTop: '2rem' // <--- PENGATUR JARAK ATAS MOBILE (32px)
+            paddingTop: '4rem', // <--- JARAK ATAS MOBILE & DESKTOP (64px) - INCREASED!
+            marginTop: '3rem' // <--- TAMBAHAN MARGIN TOP (48px)
         }}>
             <div className="container-custom">
                 {/* Main Grid - Responsive: 1 col mobile, 3 cols desktop */}
@@ -43,6 +44,8 @@ const Footer = () => {
                                 <a
                                     key={index}
                                     href={social.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
                                     aria-label={social.label}
                                     className="w-8 md:w-9 h-8 md:h-9 rounded-full border border-gray-300 flex items-center justify-center text-[--color-secondary] hover:border-[--color-primary] hover:text-[--color-primary] transition-colors"
                                 >
@@ -57,9 +60,9 @@ const Footer = () => {
                         <h6 className="hidden md:block mb-4 text-[rgb(0,0,0)]">Kontak</h6>
                         <ul className="flex flex-col items-center md:items-start gap-2 md:space-y-3">
                             <li>
-                                <a href="mailto:info@relawanns.org" className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm hover:text-[--color-primary]">
+                                <a href="mailto:relawannsteam@gmail.com" className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm hover:text-[--color-primary]">
                                     <Mail className="w-3.5 h-3.5 md:w-4 md:h-4 text-[--color-secondary]" />
-                                    <span className="text-[rgb(0,0,0)]">info@relawanns.org</span>
+                                    <span className="text-[rgb(0,0,0)]">relawannsteam@gmail.com</span>
                                 </a>
                             </li>
                             <li className="flex items-center gap-1.5 md:gap-2 text-xs md:text-sm">
@@ -73,7 +76,7 @@ const Footer = () => {
                 {/* Copyright - Always Centered */}
                 <div className="pt-4 md:pt-6 text-center">
                     <p className="text-xs md:text-sm text-[--color-secondary] mb-2">
-                        © 2025 Isthimataproject. All rights reserved.
+                        © 2025 istimata project. All rights reserved.
                     </p>
                     <div className="flex gap-4 md:gap-6 justify-center">
                         <Link to="#" className="text-xs md:text-sm text-[--color-secondary] hover:text-[--color-primary] transition-colors">

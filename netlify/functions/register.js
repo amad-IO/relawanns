@@ -310,84 +310,8 @@ exports.handler = async function (event, context) {
 
     await sql.end();
 
-    // Send Telegram notification
-    if (BOT_TOKEN && CHAT_ID) {
-      const FormData = require('form-data');
-
-      try {
-        const telegramMessage = `🆕 *PENDAFTAR BARU!*
-
-No. Pendaftar: *${registrationNumber} / ${maxQuota}*
-━━━━━━━━━━━━━━━━━
-👤 *DATA DIRI*
-Nama: ${name}
-Email: ${email}
-WA: ${phone}
-Usia: ${age} th | Kota: ${city}
-IG: [${instagramUsername}](https://instagram.com/${instagramUsername.replace('@', '')})
-History: ${participationHistory || '-'}
-
-👕 *ATRIBUT*
-Ukuran Vest: *${vestSize}*
-
-📎 *LAMPIRAN*
-• [Bukti Bayar (Link)](${paymentProofUrl})
-━━━━━━━━━━━━━━━━━
-📅 ${new Date().toLocaleString('id-ID')}`;
-
-        const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
-
-        for (const chatId of chatIds) {
-          try {
-            // Send notification message with payment proof link
-            // NOTE: Using sendMessage instead of sendPhoto because Google Drive webViewLink
-            // (https://drive.google.com/file/d/.../view) is not a direct image URL
-            await fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: telegramMessage,
-                parse_mode: 'Markdown',
-                disable_web_page_preview: false  // Show link preview
-              })
-            });
-
-          } catch (singleChatError) {
-            console.error(`Failed to send to chat ${chatId}:`, singleChatError);
-          }
-        }
-      } catch (telegramError) {
-        console.error('Telegram notification failed:', telegramError);
-      }
-
-      // Special Notification if Quota Full
-      if (isQuotaFull) {
-        // ... (existing quota logic omitted for brevity, logic remains same if I don't touch it, but I need to make sure I don't delete it inadvertently)
-        // Actually I'm replacing until line 288, so I need to include the quota logic or end the replacement usage carefully.
-        // Let's include the quota logic in the replacement content to be safe.
-        try {
-          const quotaMessage = `🚨 *KUOTA TERPENUHI!*\n\n` +
-            `Pendaftaran otomatis DITUTUP sistem.\n` +
-            `Total: ${newCount} / ${maxQuota}`;
-
-          const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
-          for (const chatId of chatIds) {
-            await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                chat_id: chatId,
-                text: quotaMessage,
-                parse_mode: 'Markdown'
-              })
-            });
-          }
-        } catch (e) { console.error('Quota notify error', e); }
-      }
-    }
-
-    return {
+    // === PREPARE SUCCESS RESPONSE (return to user immediately) ===
+    const successResponse = {
       statusCode: 200,
       headers: {
         'Content-Type': 'application/json',
@@ -401,6 +325,44 @@ Ukuran Vest: *${vestSize}*
         }
       })
     };
+
+    // === SEND TELEGRAM NOTIFICATIONS IN BACKGROUND (non-blocking) ===
+    // Don't await! Let it run asynchronously so user gets immediate response
+    console.log('🚀 Sending Telegram notifications in background...');
+
+    sendTelegramNotificationAsync({
+      name,
+      email,
+      phone,
+      age: age.toString(),
+      city,
+      instagramUsername,
+      participationHistory,
+      vestSize,
+      paymentProofUrl,
+      registrationNumber,
+      maxQuota
+    }).catch(error => {
+      // Log error but don't fail the request (user already got success response)
+      console.error('🔥 Background Telegram notification failed:', error);
+      // TODO Phase 2: Log to database for manual retry
+    });
+
+    // Send quota full notification if needed (also async, non-blocking)
+    if (isQuotaFull) {
+      console.log('🚨 Quota full - sending alert notification...');
+      sendQuotaFullNotification({
+        newCount,
+        maxQuota
+      }).catch(error => {
+        console.error('🔥 Quota notification failed:', error);
+      });
+    }
+
+    // === RETURN SUCCESS TO USER IMMEDIATELY ===
+    // User gets response in ~2.5s instead of waiting for Telegram (~9.5s)
+    console.log(`✅ Registration response sent to user (${registrationNumber}/${maxQuota})`);
+    return successResponse;
 
   } catch (error) {
     console.error('Registration error:', error);
@@ -438,5 +400,134 @@ async function fetchWithRetry(url, options, retries = 3, backoff = 1000) {
       return fetchWithRetry(url, options, retries - 1, backoff * 2); // Exponential backoff
     }
     throw error;
+  }
+}
+
+/**
+ * Send Telegram notification asynchronously with retry logic
+ * This function runs in the background and doesn't block the user response
+ * @param {Object} data - Registration data
+ * @param {number} maxRetries - Maximum retry attempts (default: 3)
+ */
+async function sendTelegramNotificationAsync(data, maxRetries = 3) {
+  const BOT_TOKEN = process.env.BOT_RELAWANNS_TOKEN;
+  const CHAT_ID = process.env.NOTIFICATION_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.warn('⚠️ Telegram credentials not configured - skipping notification');
+    return;
+  }
+
+  const telegramMessage = `🆕 *PENDAFTAR BARU!*
+
+No. Pendaftar: *${data.registrationNumber} / ${data.maxQuota}*
+━━━━━━━━━━━━━━━━━
+👤 *DATA DIRI*
+Nama: ${data.name}
+Email: ${data.email}
+WA: ${data.phone}
+Usia: ${data.age} th | Kota: ${data.city}
+IG: [${data.instagramUsername}](https://instagram.com/${data.instagramUsername.replace('@', '')})
+History: ${data.participationHistory || '-'}
+
+👕 *ATRIBUT*
+Ukuran Vest: *${data.vestSize}*
+
+📎 *LAMPIRAN*
+• [Bukti Bayar (Link)](${data.paymentProofUrl})
+━━━━━━━━━━━━━━━━━
+📅 ${new Date().toLocaleString('id-ID')}`;
+
+  const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
+
+  // Retry logic with exponential backoff
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Send to all chat IDs in parallel for speed
+      await Promise.all(
+        chatIds.map(chatId =>
+          fetchWithRetry(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              chat_id: chatId,
+              text: telegramMessage,
+              parse_mode: 'Markdown',
+              disable_web_page_preview: false
+            })
+          })
+            .then(() => console.log(`✅ Telegram notification sent to chat ${chatId} (attempt ${attempt})`))
+            .catch(err => {
+              console.error(`❌ Failed to send to chat ${chatId}:`, err.message);
+              throw err; // Propagate to trigger retry
+            })
+        )
+      );
+
+      console.log(`✅ All Telegram notifications sent successfully (attempt ${attempt}/${maxRetries})`);
+      return; // Success! Exit retry loop
+
+    } catch (error) {
+      console.error(`⚠️ Telegram notification attempt ${attempt}/${maxRetries} failed:`, error.message);
+
+      if (attempt === maxRetries) {
+        console.error(`❌ All ${maxRetries} Telegram notification attempts failed. Giving up.`);
+        // TODO Phase 2: Log to database for manual retry
+        return;
+      }
+
+      // Exponential backoff: 1s, 2s, 4s
+      const backoffDelay = Math.pow(2, attempt - 1) * 1000;
+      console.log(`⏳ Waiting ${backoffDelay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
+    }
+  }
+}
+
+/**
+ * Send quota full notification to admin (async)
+ * @param {Object} data - Quota data (newCount, maxQuota)
+ */
+async function sendQuotaFullNotification(data) {
+  const BOT_TOKEN = process.env.BOT_RELAWANNS_TOKEN;
+  const CHAT_ID = process.env.NOTIFICATION_CHAT_ID;
+
+  if (!BOT_TOKEN || !CHAT_ID) {
+    console.warn('⚠️ Telegram credentials not configured - skipping quota notification');
+    return;
+  }
+
+  try {
+    const quotaMessage = `🚨 *KUOTA TERPENUHI!*\n\n` +
+      `Pendaftaran otomatis DITUTUP sistem.\n` +
+      `Total: ${data.newCount} / ${data.maxQuota}`;
+
+    const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
+
+    // Send to all chats in parallel
+    await Promise.all(
+      chatIds.map(chatId =>
+        fetch(`https://api.telegram.org/bot${BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: chatId,
+            text: quotaMessage,
+            parse_mode: 'Markdown'
+          })
+        })
+          .then(res => {
+            if (!res.ok) throw new Error(`Chat ${chatId}: ${res.statusText}`);
+            console.log(`✅ Quota notification sent to chat ${chatId}`);
+          })
+          .catch(err => {
+            console.error(`❌ Failed to send quota notification to ${chatId}:`, err);
+          })
+      )
+    );
+
+    console.log('✅ Quota full notifications sent');
+  } catch (error) {
+    console.error('❌ Quota notification failed:', error);
   }
 }

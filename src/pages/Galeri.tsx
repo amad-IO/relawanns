@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, ZoomIn } from 'lucide-react';
+import { X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import GaleriFoto from '../components/GaleriFoto';
 
@@ -231,13 +231,7 @@ const GalleryContent = () => {
                         initial={{ opacity: 0, x: -20 }}
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ duration: 0.6 }}
-                        className={`lg:col-span-4 pb-8 transition-opacity duration-300 ${selectedImage ? 'opacity-0 pointer-events-none -z-10' : 'opacity-100'}`}
-                        style={window.innerWidth >= 1024 ? {
-                            position: 'sticky',
-                            top: '6rem',
-                            zIndex: 30,
-                            alignSelf: 'flex-start'
-                        } : {}}
+                        className={`lg:col-span-4 pb-8 lg:sticky lg:top-24 lg:self-start transition-opacity duration-300 ${selectedImage ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
                     >
                         <h1 className="mb-6 text-[rgb(0,0,0)]">Galeri Kegiatan Kami.</h1>
                         <p className="text-lg text-[--color-secondary] mb-8 leading-relaxed">
@@ -289,67 +283,69 @@ const GalleryContent = () => {
             </div>
 
             {/* Lightbox Modal */}
-            {selectedImage && createPortal(
-                <AnimatePresence>
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        exit={{ opacity: 0 }}
-                        transition={{ duration: 0.3 }}
-                        className="fixed inset-0 z-[99999] bg-black"
-                        onClick={() => setSelectedImage(null)}
-                    >
-                        {/* Close Button */}
-                        <button
+            {
+                selectedImage && createPortal(
+                    <AnimatePresence>
+                        <motion.div
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.3 }}
+                            className="fixed inset-0 z-[99999] bg-black"
                             onClick={() => setSelectedImage(null)}
-                            className="absolute top-6 right-6 w-10 h-10 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/20 transition-colors duration-300 z-10"
-                            aria-label="Close"
                         >
-                            <X className="w-5 h-5 text-white" />
-                        </button>
-
-                        {/* Content Container */}
-                        <div className="h-full flex flex-col items-center justify-center p-6 md:p-12">
-                            {/* Image */}
-                            <motion.div
-                                initial={{ scale: 0.9, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.9, opacity: 0 }}
-                                transition={{ duration: 0.3 }}
-                                className="w-full max-w-2xl mb-8"
-                                onClick={(e) => e.stopPropagation()}
+                            {/* Close Button */}
+                            <button
+                                onClick={() => setSelectedImage(null)}
+                                className="absolute top-6 right-6 w-10 h-10 bg-white/10 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white/20 transition-colors duration-300 z-10"
+                                aria-label="Close"
                             >
-                                <img
-                                    src={selectedImage.url}
-                                    alt={selectedImage.title}
-                                    className="w-full rounded-3xl shadow-2xl object-cover max-h-[50vh] md:max-h-[60vh]"
-                                />
-                            </motion.div>
+                                <X className="w-5 h-5 text-white" />
+                            </button>
 
-                            {/* Info Section */}
-                            <motion.div
-                                initial={{ y: 20, opacity: 0 }}
-                                animate={{ y: 0, opacity: 1 }}
-                                transition={{ duration: 0.3, delay: 0.1 }}
-                                className="text-center max-w-xl"
-                                onClick={(e) => e.stopPropagation()}
-                            >
-                                <span className="inline-block px-4 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm mb-4">
-                                    {selectedImage.category}
-                                </span>
-                                <h2 className="text-white text-2xl md:text-3xl font-bold mb-3">
-                                    {selectedImage.title}
-                                </h2>
-                                <p className="text-white/80 text-base md:text-lg">
-                                    {selectedImage.description}
-                                </p>
-                            </motion.div>
-                        </div>
-                    </motion.div>
-                </AnimatePresence>,
-                document.body
-            )}
-        </section>
+                            {/* Content Container */}
+                            <div className="h-full flex flex-col items-center justify-center p-6 md:p-12">
+                                {/* Image */}
+                                <motion.div
+                                    initial={{ scale: 0.9, opacity: 0 }}
+                                    animate={{ scale: 1, opacity: 1 }}
+                                    exit={{ scale: 0.9, opacity: 0 }}
+                                    transition={{ duration: 0.3 }}
+                                    className="w-full max-w-2xl mb-8"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <img
+                                        src={selectedImage.url}
+                                        alt={selectedImage.title}
+                                        className="w-full rounded-3xl shadow-2xl object-cover max-h-[50vh] md:max-h-[60vh]"
+                                    />
+                                </motion.div>
+
+                                {/* Info Section */}
+                                <motion.div
+                                    initial={{ y: 20, opacity: 0 }}
+                                    animate={{ y: 0, opacity: 1 }}
+                                    transition={{ duration: 0.3, delay: 0.1 }}
+                                    className="text-center max-w-xl"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <span className="inline-block px-4 py-1.5 bg-white/10 backdrop-blur-sm rounded-full text-white text-sm mb-4">
+                                        {selectedImage.category}
+                                    </span>
+                                    <h2 className="text-white text-2xl md:text-3xl font-bold mb-3">
+                                        {selectedImage.title}
+                                    </h2>
+                                    <p className="text-white/80 text-base md:text-lg">
+                                        {selectedImage.description}
+                                    </p>
+                                </motion.div>
+                            </div>
+                        </motion.div>
+                    </AnimatePresence>,
+                    document.body
+                )
+            }
+        </section >
     );
 };
 

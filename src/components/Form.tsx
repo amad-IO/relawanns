@@ -568,7 +568,7 @@ const Form = () => {
                                     {/* ----- STEP 3: FINALISASI ----- */}
                                     {currentStep === 3 && (
                                         <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-                                            <h3 className="text-xl font-semibold mb-4">Pembayaran & Finalisasi</h3>
+                                            <h3 className="text-xl font-semibold mb-4">Pembayaran</h3>
 
                                             {/* Summary */}
                                             <div className="bg-gray-50 rounded-xl p-4 text-sm text-gray-700 space-y-2 mb-6">
