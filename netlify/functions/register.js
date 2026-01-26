@@ -161,6 +161,12 @@ exports.handler = async function (event, context) {
     };
 
     // === GOOGLE WORKSPACE INTEGRATION ===
+    // Declare variables outside try block so they're accessible for database insert
+    let paymentProofUrl = null;
+    let tiktokDriveLink = 'Tidak ada';
+    let instagramDriveLink = 'Tidak ada';
+    let paymentDriveLink = null;
+
     // Generate sheet/folder name based on event
     // Normalize date format if it's in Indonesian long format
     let normalizedDate = eventDate;
@@ -199,7 +205,7 @@ exports.handler = async function (event, context) {
       // This saves 4-6 seconds by running uploads in parallel instead of sequential!
       console.log('🚀 Starting parallel file uploads to Google Drive...');
 
-      const [paymentProofUrl, tiktokDriveLink, instagramDriveLink] = await Promise.all([
+      [paymentProofUrl, tiktokDriveLink, instagramDriveLink] = await Promise.all([
         // Upload payment proof (WAJIB - full name for clarity)
         uploadToDrive(
           paymentProofFile.buffer,
@@ -228,7 +234,7 @@ exports.handler = async function (event, context) {
       console.log('✅ All files uploaded to Google Drive successfully!');
 
       // Alias for compatibility with existing code
-      const paymentDriveLink = paymentProofUrl;
+      paymentDriveLink = paymentProofUrl;
 
       // 3. Create or get the sheet for this event
       await getOrCreateSheet(sheetFolderName);
