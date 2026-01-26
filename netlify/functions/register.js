@@ -170,6 +170,19 @@ exports.handler = async function (event, context) {
     // Upload ONLY Payment Proof to Supabase (keeping as backup)
     const paymentProofUrl = await uploadFile(paymentProofFile, 'payment');
 
+    // === HELPER FUNCTIONS FOR NAME TRUNCATION ===
+
+    // Truncate event title if too long (max 25 chars for event name part)
+    const truncateEventTitle = (title, maxLength = 25) => {
+      if (title.length <= maxLength) return title;
+      return title.substring(0, maxLength) + '...';
+    };
+
+    // Extract first name from full name (for file naming)
+    const getFirstName = (fullName) => {
+      return fullName.trim().split(' ')[0];
+    };
+
     // === GOOGLE WORKSPACE INTEGRATION ===
     // Generate sheet/folder name based on event
     // Normalize date format if it's in Indonesian long format
@@ -188,9 +201,13 @@ exports.handler = async function (event, context) {
       }
     }
 
-    // Sanitize name: remove special characters that might cause issues
-    const sheetFolderName = `${eventTitle} - ${normalizedDate}`.replace(/[\/\\:*?"<>|]/g, '');
+    // Truncate event title and sanitize name
+    const truncatedEventTitle = truncateEventTitle(eventTitle);
+    const sheetFolderName = `${truncatedEventTitle} - ${normalizedDate}`.replace(/[/\\:*?"<>|]/g, '');
     console.log(`📋 Sheet/Folder name: "${sheetFolderName}"`);
+
+    // Get first name for file naming (to avoid long file names)
+    const firstName = getFirstName(name);
 
 
     try {
@@ -201,7 +218,7 @@ exports.handler = async function (event, context) {
       const paymentFolderId = await getOrCreateFolder('Bukti Pembayaran', eventFolderId);
       const sosmedFolderId = await getOrCreateFolder('Screenshot Sosmed', eventFolderId);
 
-      // 3. Upload payment proof to "Bukti Pembayaran" subfolder
+      // 3. Upload payment proof to "Bukti Pembayaran" subfolder (FULL NAME)
       const paymentDriveLink = await uploadToDrive(
         paymentProofFile.buffer,
         `payment_${name}_${Date.now()}.${paymentProofFile.filename.split('.').pop()}`,
@@ -209,17 +226,17 @@ exports.handler = async function (event, context) {
         paymentFolderId
       );
 
-      // 4. Upload social media screenshots to "Screenshot Sosmed" subfolder
+      // 4. Upload social media screenshots to "Screenshot Sosmed" subfolder (using first name)
       const tiktokDriveLink = tiktokProofFile ? await uploadToDrive(
         tiktokProofFile.buffer,
-        `tiktok_${name}_${Date.now()}.${tiktokProofFile.filename.split('.').pop()}`,
+        `tiktok_${firstName}_${Date.now()}.${tiktokProofFile.filename.split('.').pop()}`,
         tiktokProofFile.mimeType,
         sosmedFolderId
       ) : 'Tidak ada';
 
       const instagramDriveLink = instagramProofFile ? await uploadToDrive(
         instagramProofFile.buffer,
-        `instagram_${name}_${Date.now()}.${instagramProofFile.filename.split('.').pop()}`,
+        `instagram_${firstName}_${Date.now()}.${instagramProofFile.filename.split('.').pop()}`,
         instagramProofFile.mimeType,
         sosmedFolderId
       ) : 'Tidak ada';

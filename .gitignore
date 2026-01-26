@@ -1,9 +1,11 @@
-# Node modules
+# Dependencies
 node_modules/
 
 # Build output
-build/
 dist/
+build/
+dist-ssr
+*.local
 
 # Scripts
 script/
