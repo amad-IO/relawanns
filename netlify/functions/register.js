@@ -197,26 +197,31 @@ exports.handler = async function (event, context) {
       // 1. Create or get event-specific folder in Google Drive
       const eventFolderId = await getOrCreateFolder(sheetFolderName);
 
-      // 2. Upload files to Google Drive
+      // 2. Create subfolders for better organization
+      const paymentFolderId = await getOrCreateFolder('Bukti Pembayaran', eventFolderId);
+      const sosmedFolderId = await getOrCreateFolder('Screenshot Sosmed', eventFolderId);
+
+      // 3. Upload payment proof to "Bukti Pembayaran" subfolder
       const paymentDriveLink = await uploadToDrive(
         paymentProofFile.buffer,
         `payment_${name}_${Date.now()}.${paymentProofFile.filename.split('.').pop()}`,
         paymentProofFile.mimeType,
-        eventFolderId
+        paymentFolderId
       );
 
+      // 4. Upload social media screenshots to "Screenshot Sosmed" subfolder
       const tiktokDriveLink = tiktokProofFile ? await uploadToDrive(
         tiktokProofFile.buffer,
         `tiktok_${name}_${Date.now()}.${tiktokProofFile.filename.split('.').pop()}`,
         tiktokProofFile.mimeType,
-        eventFolderId
+        sosmedFolderId
       ) : 'Tidak ada';
 
       const instagramDriveLink = instagramProofFile ? await uploadToDrive(
         instagramProofFile.buffer,
         `instagram_${name}_${Date.now()}.${instagramProofFile.filename.split('.').pop()}`,
         instagramProofFile.mimeType,
-        eventFolderId
+        sosmedFolderId
       ) : 'Tidak ada';
 
       // 3. Create or get the sheet for this event
