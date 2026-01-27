@@ -33,54 +33,44 @@ const EventHeroSection = () => {
     React.useEffect(() => {
         const fetchData = async () => {
             try {
-                // Check if local or production
-                const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                // Import Supabase client
+                const { supabase } = await import('../lib/supabase');
 
-                if (isDev) {
-                    // Local development: manual hardcode untuk test
-                    const isOpen = false; // CHANGE THIS: true = buka, false = tutup
+                // Fetch registration status from Supabase
+                const { data: settingsData, error: settingsError } = await supabase
+                    .from('event_settings')
+                    .select('value')
+                    .eq('key', 'registration_status')
+                    .single();
 
-                    setRegistrationStatus({
-                        isOpen,
-                        message: isOpen ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
-                        loading: false
-                    });
+                if (settingsError) throw settingsError;
 
-                    // Hardcode event data for local dev
-                    setEventData({
-                        title: 'Relawanns Mengajar: mengajak adik-adik belajar, bermain, bersama relawanns.',
-                        location: 'Surabaya',
-                        locationMaps: '#',
-                        date: 'Minggu 18 Januari 2025',
-                        loading: false
-                    });
-                    return;
-                }
+                const isOpen = settingsData?.value === 'open';
+                setRegistrationStatus({
+                    isOpen,
+                    message: isOpen ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
+                    loading: false
+                });
 
-                // Production: fetch dari API
-                // Fetch registration status
-                const statusResponse = await fetch('/.netlify/functions/check-status');
-                const statusResult = await statusResponse.json();
+                // Fetch event details from Supabase
+                const { data: eventDataResult, error: eventError } = await supabase
+                    .from('event_settings')
+                    .select('value, key')
+                    .in('key', ['event_title', 'event_location_name', 'event_location_maps', 'event_date']);
 
-                if (statusResult.success) {
-                    setRegistrationStatus({
-                        isOpen: statusResult.data.isOpen,
-                        message: statusResult.data.isOpen ? 'Pendaftaran Dibuka' : 'Pendaftaran Ditutup',
-                        loading: false
-                    });
-                }
+                if (eventError) throw eventError;
 
-                // Fetch event details
-                const detailsResponse = await fetch('/.netlify/functions/get-event-details');
-                const detailsResult = await detailsResponse.json();
+                // Parse event data
+                const eventMap = eventDataResult?.reduce((acc: any, item: any) => {
+                    acc[item.key] = item.value;
+                    return acc;
+                }, {});
 
-                if (detailsResult.success) {
-                    // Format date
-                    const dateStr = detailsResult.data.date;
-                    let formattedDate = dateStr;
-
-                    try {
-                        const date = new Date(dateStr);
+                // Format date
+                let formattedDate = eventMap?.event_date || 'Belum diset';
+                try {
+                    if (eventMap?.event_date) {
+                        const date = new Date(eventMap.event_date);
                         const options: Intl.DateTimeFormatOptions = {
                             weekday: 'long',
                             year: 'numeric',
@@ -88,18 +78,18 @@ const EventHeroSection = () => {
                             day: 'numeric'
                         };
                         formattedDate = date.toLocaleDateString('id-ID', options);
-                    } catch (e) {
-                        // Keep original if formatting fails
                     }
-
-                    setEventData({
-                        title: detailsResult.data.title,
-                        location: detailsResult.data.location,
-                        locationMaps: detailsResult.data.locationMaps,
-                        date: formattedDate,
-                        loading: false
-                    });
+                } catch (e) {
+                    // Keep original if formatting fails
                 }
+
+                setEventData({
+                    title: eventMap?.event_title || 'Event Relawanns',
+                    location: eventMap?.event_location_name || 'Belum diset',
+                    locationMaps: eventMap?.event_location_maps || '#',
+                    date: formattedDate,
+                    loading: false
+                });
             } catch (error) {
                 console.error('Failed to fetch data:', error);
                 setRegistrationStatus({
@@ -226,38 +216,42 @@ const EventDetailsSection = () => {
     React.useEffect(() => {
         const fetchDetails = async () => {
             try {
-                const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
+                // Import Supabase client
+                const { supabase } = await import('../lib/supabase');
 
-                if (isDev) {
-                    // Hardcode for local dev
-                    setEventDetails({
-                        description: 'Relawanns membuka kesempatan bagi individu yang ingin berkontribusi nyata untuk masyarakat Indonesia. Sebagai relawan, Anda akan terlibat langsung dalam berbagai program sosial seperti pendidikan anak, layanan kesehatan gratis, pelestarian lingkungan, dan tanggap bencana.',
-                        requirements: [
-                            'Warga Negara Indonesia (WNI) berusia minimal 17 tahun',
-                            'Memiliki komitmen dan dedikasi tinggi untuk membantu sesama',
-                            'Mampu bekerja dalam tim dan berkomunikasi dengan baik',
-                            'Membayar biaya pendaftaran sebesar Rp. 99.000'
-                        ],
-                        maxQuota: 25,
-                        category: 'Event',
-                        loading: false
-                    });
-                    return;
+                // Fetch event details from Supabase
+                const { data: eventDataResult, error: eventError } = await supabase
+                    .from('event_settings')
+                    .select('value, key')
+                    .in('key', ['event_description', 'requirements', 'max_quota', 'event_category']);
+
+                if (eventError) throw eventError;
+
+                // Parse event data
+                const eventMap = eventDataResult?.reduce((acc: any, item: any) => {
+                    acc[item.key] = item.value;
+                    return acc;
+                }, {});
+
+                // Parse requirements (stored as string array or JSON)
+                let requirements: string[] = [];
+                try {
+                    if (eventMap?.requirements) {
+                        requirements = typeof eventMap.requirements === 'string'
+                            ? JSON.parse(eventMap.requirements)
+                            : eventMap.requirements;
+                    }
+                } catch (e) {
+                    console.error('Failed to parse requirements:', e);
                 }
 
-                // Production: fetch from API
-                const response = await fetch('/.netlify/functions/get-event-details');
-                const result = await response.json();
-
-                if (result.success) {
-                    setEventDetails({
-                        description: result.data.description,
-                        requirements: result.data.requirements || [],
-                        maxQuota: result.data.maxQuota,
-                        category: result.data.category === 'volunteer' ? 'Volunteer' : 'Event',
-                        loading: false
-                    });
-                }
+                setEventDetails({
+                    description: eventMap?.event_description || 'Deskripsi tidak tersedia',
+                    requirements: requirements || [],
+                    maxQuota: parseInt(eventMap?.max_quota) || 0,
+                    category: eventMap?.event_category === 'volunteer' ? 'Volunteer' : 'Event',
+                    loading: false
+                });
             } catch (error) {
                 console.error('Failed to fetch details:', error);
                 setEventDetails({
