@@ -158,11 +158,19 @@ const Form = () => {
     useEffect(() => {
         const fetchStatus = async () => {
             try {
-                const response = await fetch('/api/check-status');
-                const result = await response.json();
-                if (result.success) {
-                    setRegistrationOpen(result.data.isOpen);
-                }
+                // Import Supabase client
+                const { supabase } = await import('../lib/supabase');
+
+                // Fetch registration status from Supabase
+                const { data, error } = await supabase
+                    .from('event_settings')
+                    .select('value')
+                    .eq('key', 'registration_status')
+                    .single();
+
+                if (error) throw error;
+
+                setRegistrationOpen(data?.value === 'open');
             } catch (error) {
                 console.error('Failed to fetch registration status:', error);
                 setRegistrationOpen(false);
