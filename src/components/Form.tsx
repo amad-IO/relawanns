@@ -349,10 +349,10 @@ const Form = () => {
         setStatusMessage('Memproses...');
 
         try {
-            // Prepare Submission
-            const submitData = new FormData();
+            // Import Supabase client
+            const { supabase } = await import('../lib/supabase');
 
-            // Sanitize
+            // Sanitize input data
             const cleanData = {
                 name: sanitizeInput(formData.name),
                 email: sanitizeInput(formData.email),
@@ -364,38 +364,98 @@ const Form = () => {
                 vestSize: formData.vestSize
             };
 
-            // Append Text Fields
-            Object.keys(cleanData).forEach(key => {
-                submitData.append(key, cleanData[key as keyof typeof cleanData]);
-            });
+            // Upload files to Supabase Storage
+            const timestamp = Date.now();
+            const fileUrls: {
+                paymentProof?: string;
+                tiktokProof?: string;
+                instagramProof?: string;
+            } = {};
 
-            // Append Files
-            if (compressedPayment) {
-                submitData.append('paymentProof', compressedPayment);
-            } else if (formData.paymentProof) {
-                submitData.append('paymentProof', formData.paymentProof);
+            // Upload payment proof
+            if (compressedPayment || formData.paymentProof) {
+                const file = compressedPayment || formData.paymentProof;
+                if (file) {
+                    const fileName = `payment_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${file.name.split('.').pop()}`;
+                    const { data: uploadData, error: uploadError } = await supabase.storage
+                        .from('registrations')
+                        .upload(fileName, file, {
+                            cacheControl: '3600',
+                            upsert: false
+                        });
+
+                    if (uploadError) throw new Error('Gagal upload bukti pembayaran: ' + uploadError.message);
+
+                    const { data: urlData } = supabase.storage
+                        .from('registrations')
+                        .getPublicUrl(fileName);
+
+                    fileUrls.paymentProof = urlData.publicUrl;
+                }
             }
 
-            if (formData.tiktokProof) submitData.append('tiktokProof', formData.tiktokProof);
-            if (formData.instagramProof) submitData.append('instagramProof', formData.instagramProof);
+            // Upload TikTok proof
+            if (formData.tiktokProof) {
+                const fileName = `tiktok_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${formData.tiktokProof.name.split('.').pop()}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('registrations')
+                    .upload(fileName, formData.tiktokProof, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
 
-            // API Call
-            const response = await fetch('/.netlify/functions/register', {
-                method: 'POST',
-                body: submitData
-            });
+                if (uploadError) throw new Error('Gagal upload bukti TikTok: ' + uploadError.message);
 
-            const result = await response.json();
-            if (!response.ok || !result.success) {
-                throw new Error(result.message || 'Terjadi kesalahan saat mendaftar');
+                const { data: urlData } = supabase.storage
+                    .from('registrations')
+                    .getPublicUrl(fileName);
+
+                fileUrls.tiktokProof = urlData.publicUrl;
             }
+
+            // Upload Instagram proof
+            if (formData.instagramProof) {
+                const fileName = `instagram_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${formData.instagramProof.name.split('.').pop()}`;
+                const { data: uploadData, error: uploadError } = await supabase.storage
+                    .from('registrations')
+                    .upload(fileName, formData.instagramProof, {
+                        cacheControl: '3600',
+                        upsert: false
+                    });
+
+                if (uploadError) throw new Error('Gagal upload bukti Instagram: ' + uploadError.message);
+
+                const { data: urlData } = supabase.storage
+                    .from('registrations')
+                    .getPublicUrl(fileName);
+
+                fileUrls.instagramProof = urlData.publicUrl;
+            }
+
+            // Insert registration data to Supabase
+            const { data: insertData, error: insertError } = await supabase
+                .from('registrations')
+                .insert([{
+                    name: cleanData.name,
+                    email: cleanData.email,
+                    phone: cleanData.phone,
+                    age: parseInt(cleanData.age),
+                    city: cleanData.city,
+                    instagram_username: cleanData.instagramUsername,
+                    participation_history: cleanData.participationHistory === 'yes',
+                    vest_size: cleanData.vestSize,
+                    payment_proof_url: fileUrls.paymentProof,
+                    tiktok_proof_url: fileUrls.tiktokProof,
+                    instagram_proof_url: fileUrls.instagramProof,
+                    status: 'pending',
+                    created_at: new Date().toISOString()
+                }])
+                .select();
+
+            if (insertError) throw new Error('Gagal menyimpan pendaftaran: ' + insertError.message);
 
             setIsSubmitted(true);
             setIsSubmitting(false);
-
-            // ❌ REMOVED: Auto-reset form after 3 seconds
-            // Form will stay filled until user manually refreshes the page
-            // This allows user to review their submitted data
 
         } catch (error: any) {
             console.error('Submission error:', error);
