@@ -371,6 +371,7 @@ const Form = () => {
                 tiktokProof?: string;
                 instagramProof?: string;
             } = {};
+            const filesToSync: { url: string; name: string }[] = [];
 
             // Upload payment proof
             if (compressedPayment || formData.paymentProof) {
@@ -391,6 +392,7 @@ const Form = () => {
                         .getPublicUrl(fileName);
 
                     fileUrls.paymentProof = urlData.publicUrl;
+                    filesToSync.push({ url: urlData.publicUrl, name: fileName });
                 }
             }
 
@@ -411,6 +413,7 @@ const Form = () => {
                     .getPublicUrl(fileName);
 
                 fileUrls.tiktokProof = urlData.publicUrl;
+                filesToSync.push({ url: urlData.publicUrl, name: fileName });
             }
 
             // Upload Instagram proof
@@ -426,10 +429,11 @@ const Form = () => {
                 if (uploadError) throw new Error('Gagal upload bukti Instagram: ' + uploadError.message);
 
                 const { data: urlData } = supabase.storage
-                    .from('registrations')
+                    .from('payment-proofs')
                     .getPublicUrl(fileName);
 
                 fileUrls.instagramProof = urlData.publicUrl;
+                filesToSync.push({ url: urlData.publicUrl, name: fileName });
             }
 
             // Insert registration data to Supabase
@@ -453,6 +457,33 @@ const Form = () => {
                 .select();
 
             if (insertError) throw new Error('Gagal menyimpan pendaftaran: ' + insertError.message);
+
+            // Trigger Background Process (Drive, Sheet, Telegram)
+            try {
+                // Don't await this if we want super fast response? 
+                // Vercel serverless functions require await otherwise they might be killed.
+                // But we can just fire the fetch and not await the result JSON, just await the fetch call itself.
+
+                setStatusMessage('Menyimpan data cadangan...');
+
+                const payload = {
+                    registrationData: {
+                        ...cleanData,
+                        fileUrls: fileUrls
+                    },
+                    files: filesToSync
+                };
+
+                await fetch('/api/process-registration', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+
+            } catch (bgError) {
+                console.error('Background process warning:', bgError);
+                // Non-blocking error
+            }
 
             setIsSubmitted(true);
             setIsSubmitting(false);
