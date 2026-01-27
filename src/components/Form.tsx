@@ -429,7 +429,7 @@ const Form = () => {
                 if (uploadError) throw new Error('Gagal upload bukti Instagram: ' + uploadError.message);
 
                 const { data: urlData } = supabase.storage
-                    .from('payment-proofs')
+                    .from('registrations')
                     .getPublicUrl(fileName);
 
                 fileUrls.instagramProof = urlData.publicUrl;
@@ -474,11 +474,21 @@ const Form = () => {
                     files: filesToSync
                 };
 
-                await fetch('/api/process-registration', {
+
+                const response = await fetch('/api/process-registration', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
+
+                const result = await response.json();
+
+                if (!response.ok || !result.success) {
+                    console.error('Backend processing failed:', result);
+                    // Don't throw - this is non-critical background task
+                } else {
+                    console.log('Backend processing successful:', result);
+                }
 
             } catch (bgError) {
                 console.error('Background process warning:', bgError);

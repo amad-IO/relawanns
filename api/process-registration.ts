@@ -17,7 +17,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         // registrationData: { name, email, phone, age, city, ... }
         // files: [{ url, name }, ...]
 
+        console.log('=== BACKEND FUNCTION CALLED ===');
         console.log('Processing registration for:', registrationData?.name);
+        console.log('Files to sync:', files?.length || 0);
+        console.log('Payload received:', JSON.stringify({ registrationData, filesCount: files?.length }));
 
         // 1. Setup Credentials
         const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
@@ -28,6 +31,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const chatId = process.env.NOTIFICATION_CHAT_ID;
 
         // Basic validation
+        console.log('Environment check:', {
+            hasClientEmail: !!clientEmail,
+            hasPrivateKey: !!privateKey,
+            hasSpreadsheetId: !!spreadsheetId,
+            hasFolderId: !!targetFolderId,
+            hasTelegramToken: !!telegramToken,
+            hasChatId: !!chatId
+        });
+
         if (!clientEmail || !privateKey) {
             console.error('Missing Google Credentials');
             return res.status(500).json({ success: false, message: 'Server config error (Google)' });
@@ -155,9 +167,11 @@ Cek detail lengkap di Dashboard / Google Sheet.
         tasks.push(telegramTask());
 
         // EXECUTE ALL IN PARALLEL
-        await Promise.all(tasks);
+        console.log('Executing', tasks.length, 'parallel tasks...');
+        const results = await Promise.all(tasks);
+        console.log('All tasks completed:', results);
 
-        return res.status(200).json({ success: true, message: 'All backend tasks processed' });
+        return res.status(200).json({ success: true, message: 'All backend tasks processed', results });
 
     } catch (error: any) {
         console.error('Process error:', error);
