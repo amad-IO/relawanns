@@ -1,8 +1,7 @@
 // Google Workspace API Utilities with OAuth Authentication
-// Ported from Netlify function to TypeScript for Vercel
+// Ported from Netlify function to TypeScript for Vercel - CommonJS version
 
-import { google } from 'googleapis';
-import type { drive_v3 } from 'googleapis';
+const { google } = require('googleapis');
 
 // Environment variables
 const SPREADSHEET_ID = process.env.GOOGLE_SHEET_ID;
@@ -15,7 +14,7 @@ const OAUTH_REFRESH_TOKEN = process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
  * Get authenticated Google API client using OAuth 2.0
  * Uses refresh token to generate access tokens automatically
  */
-export function getOAuthClient() {
+function getOAuthClient() {
     try {
         if (!OAUTH_CLIENT_ID || !OAUTH_CLIENT_SECRET || !OAUTH_REFRESH_TOKEN) {
             throw new Error('Missing OAuth credentials. Please set GOOGLE_OAUTH_CLIENT_ID, GOOGLE_OAUTH_CLIENT_SECRET, and GOOGLE_OAUTH_REFRESH_TOKEN');
@@ -44,7 +43,7 @@ export function getOAuthClient() {
  * @param sheetName - Name of the sheet to find or create
  * @returns Sheet ID
  */
-export async function getOrCreateSheet(sheetName: string): Promise<number> {
+async function getOrCreateSheet(sheetName) {
     try {
         const auth = getOAuthClient();
         const sheets = google.sheets({ version: 'v4', auth });
@@ -182,7 +181,7 @@ export async function getOrCreateSheet(sheetName: string): Promise<number> {
  * @param sheetName - Name of the sheet
  * @param rowData - Array of values for the row
  */
-export async function appendToSheet(sheetName: string, rowData: any[]): Promise<void> {
+async function appendToSheet(sheetName, rowData) {
     try {
         const auth = getOAuthClient();
         const sheets = google.sheets({ version: 'v4', auth });
@@ -198,7 +197,7 @@ export async function appendToSheet(sheetName: string, rowData: any[]): Promise<
         });
 
         const rowCount = response.data.values ? response.data.values.length : 0;
-        const rowNumber: number = rowCount; // Header is row 1, so this is the next available row
+        const rowNumber = rowCount; // Header is row 1, so this is the next available row
 
         // Prepend row number to data
         const dataWithNumber = [rowNumber, ...rowData];
@@ -227,17 +226,17 @@ export async function appendToSheet(sheetName: string, rowData: any[]): Promise<
  * @param parentFolderId - Parent folder ID (optional)
  * @returns Shareable link to the file
  */
-export async function uploadToDrive(
-    fileBuffer: Buffer | ArrayBuffer,
-    fileName: string,
-    mimeType: string,
-    parentFolderId: string | null = null
-): Promise<string> {
+async function uploadToDrive(
+    fileBuffer,
+    fileName,
+    mimeType,
+    parentFolderId = null
+) {
     try {
         const auth = getOAuthClient();
         const drive = google.drive({ version: 'v3', auth });
 
-        const fileMetadata: drive_v3.Schema$File = {
+        const fileMetadata = {
             name: fileName,
             parents: parentFolderId ? [parentFolderId] : [],
         };
@@ -247,7 +246,7 @@ export async function uploadToDrive(
             ? Buffer.from(fileBuffer)
             : fileBuffer;
 
-        const { Readable } = await import('stream');
+        const { Readable } = require('stream');
         const media = {
             mimeType: mimeType,
             body: Readable.from(buffer),
@@ -287,10 +286,10 @@ export async function uploadToDrive(
  * @param parentFolderId - Parent folder ID
  * @returns Folder ID
  */
-export async function getOrCreateFolder(
-    folderName: string,
-    parentFolderId: string = DRIVE_FOLDER_ID || ''
-): Promise<string> {
+async function getOrCreateFolder(
+    folderName,
+    parentFolderId = DRIVE_FOLDER_ID || ''
+) {
     try {
         const auth = getOAuthClient();
         const drive = google.drive({ version: 'v3', auth });
@@ -318,7 +317,7 @@ export async function getOrCreateFolder(
 
         // Create new folder
         console.log(`📁 Creating new folder: "${folderName}"`);
-        const folderMetadata: drive_v3.Schema$File = {
+        const folderMetadata = {
             name: folderName,
             mimeType: 'application/vnd.google-apps.folder',
             parents: [parentFolderId],
@@ -347,7 +346,16 @@ export async function getOrCreateFolder(
  * @param url - Supabase public URL
  * @returns Filename
  */
-export function extractFileName(url: string): string {
+function extractFileName(url) {
     const parts = url.split('/');
     return parts[parts.length - 1];
 }
+
+module.exports = {
+    getOAuthClient,
+    getOrCreateSheet,
+    appendToSheet,
+    uploadToDrive,
+    getOrCreateFolder,
+    extractFileName
+};

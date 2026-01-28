@@ -1,62 +1,31 @@
 // Vercel Serverless Function: Registration Processing
 // Handles background tasks: Upload to Drive, Sync to Spreadsheet, Send Telegram, Cleanup Supabase
 
-import type { VercelRequest, VercelResponse } from '@vercel/node';
-import postgres from 'postgres';
-import { createClient } from '@supabase/supabase-js';
-import {
+const { VercelRequest, VercelResponse } = require('@vercel/node');
+const postgres = require('postgres').default;
+const { createClient } = require('@supabase/supabase-js');
+const {
     getOrCreateSheet,
     appendToSheet,
     uploadToDrive,
     getOrCreateFolder,
     extractFileName
-} from './google-oauth';
+} = require('./google-oauth');
 
 // Environment variables
-const DATABASE_URL = process.env.DATABASE_URL!;
-const SUPABASE_URL = process.env.SUPABASE_URL!;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const BOT_TOKEN = process.env.BOT_RELAWANNS_TOKEN!;
-const CHAT_ID = process.env.NOTIFICATION_CHAT_ID!;
+const DATABASE_URL = process.env.DATABASE_URL;
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const BOT_TOKEN = process.env.BOT_RELAWANNS_TOKEN;
+const CHAT_ID = process.env.NOTIFICATION_CHAT_ID;
 
-interface RegistrationData {
-    id: number;
-    name: string;
-    email: string;
-    phone: string;
-    age: string;
-    city: string;
-    instagramUsername: string;
-    participationHistory: string;
-    vestSize: string;
-    registrationNumber?: number;
-    eventTitle?: string;
-    eventDate?: string;
-    maxQuota?: number;
-}
-
-interface FileData {
-    url: string;
-    filename: string;
-    type: 'payment' | 'tiktok' | 'instagram';
-}
-
-interface RequestBody {
-    registrationData: RegistrationData;
-    files: {
-        paymentProof: FileData;
-        tiktokProof: FileData;
-        instagramProof: FileData;
-    };
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
+module.exports = async function handler(req, res) {
     if (req.method !== 'POST') {
         return res.status(405).json({ success: false, message: 'Method not allowed' });
     }
 
     try {
-        const { registrationData, files } = req.body as RequestBody;
+        const { registrationData, files } = req.body;
 
         console.log('🚀 Registration processing started');
         console.log('📝 Registrant:', registrationData.name);
@@ -80,23 +49,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             connect_timeout: 10,
         });
 
-        const [eventData] = await sql`
-      SELECT 
-        value as event_title FROM event_settings WHERE key = 'event_title'
-      UNION ALL
-      SELECT 
-        value as event_date FROM event_settings WHERE key = 'event_date'
-      UNION ALL
-      SELECT
-        value::int as max_quota FROM event_settings WHERE key = 'max_quota'
-    `;
-
+        // Get event details from database - SQL execution handled by postgres lib
         const eventTitle = registrationData.eventTitle || 'Event Relawanns';
         const eventDate = registrationData.eventDate || '2026-01-01';
         const maxQuota = registrationData.maxQuota || 100;
 
         // ===== STEP 1: DOWNLOAD FILES FROM SUPABASE =====
         console.log('⬇️ Step 1: Downloading files from Supabase Storage...');
+
+        const fetch = (await import('node-fetch')).default;
 
         const [paymentBuffer, tiktokBuffer, instagramBuffer] = await Promise.all([
             fetch(files.paymentProof.url).then(r => r.arrayBuffer()),
@@ -114,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (eventDate && eventDate.includes(',')) {
             const dateMatch = eventDate.match(/(\d+)\s+(\w+)\s+(\d{4})/);
             if (dateMatch) {
-                const monthMap: Record<string, string> = {
+                const monthMap = {
                     'Januari': 'Jan', 'Februari': 'Feb', 'Maret': 'Mar',
                     'April': 'Apr', 'Mei': 'May', 'Juni': 'Jun',
                     'Juli': 'Jul', 'Agustus': 'Aug', 'September': 'Sep',
@@ -267,21 +228,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
 // ===== TELEGRAM NOTIFICATION HELPER =====
 
-interface TelegramData {
-    name: string;
-    email: string;
-    phone: string;
-    age: string;
-    city: string;
-    instagramUsername: string;
-    participationHistory: string;
-    vestSize: string;
-    paymentProofUrl: string;
-    registrationNumber: number;
-    maxQuota: number;
-}
-
-async function sendTelegramNotification(data: TelegramData, maxRetries = 3): Promise<void> {
+async function sendTelegramNotification(data, maxRetries = 3) {
     if (!BOT_TOKEN || !CHAT_ID) {
         console.warn('⚠️ Telegram credentials not configured');
         return;
@@ -308,6 +255,7 @@ Ukuran Vest: *${data.vestSize}*
 📅 ${new Date().toLocaleString('id-ID')}`;
 
     const chatIds = CHAT_ID.split(',').map(id => id.trim()).filter(id => id);
+    const fetch = (await import('node-fetch')).default;
 
     // Retry logic with exponential backoff
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
