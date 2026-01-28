@@ -460,20 +460,54 @@ const Form = () => {
 
             // Trigger Background Process (Drive, Sheet, Telegram)
             try {
-                // Don't await this if we want super fast response? 
-                // Vercel serverless functions require await otherwise they might be killed.
-                // But we can just fire the fetch and not await the result JSON, just await the fetch call itself.
-
+                // Prepare payload with proper structure
                 setStatusMessage('Menyimpan data cadangan...');
+
+                // Get event details (if available from context)
+                const { data: eventData } = await supabase
+                    .from('event_settings')
+                    .select('key, value')
+                    .in('key', ['event_title', 'event_date', 'max_quota', 'current_registrants']);
+
+                const eventSettings: Record<string, any> = {};
+                eventData?.forEach(item => {
+                    eventSettings[item.key] = item.value;
+                });
 
                 const payload = {
                     registrationData: {
-                        ...cleanData,
-                        fileUrls: fileUrls
+                        id: insertData[0].id,
+                        name: cleanData.name,
+                        email: cleanData.email,
+                        phone: cleanData.phone,
+                        age: cleanData.age,
+                        city: cleanData.city,
+                        instagramUsername: cleanData.instagramUsername,
+                        participationHistory: cleanData.participationHistory === 'yes' ? 'Sudah Pernah' : 'Belum Pernah',
+                        vestSize: cleanData.vestSize,
+                        registrationNumber: eventSettings.current_registrants ? parseInt(eventSettings.current_registrants) : 0,
+                        eventTitle: eventSettings.event_title || 'Event Relawanns',
+                        eventDate: eventSettings.event_date || new Date().toLocaleDateString('id-ID'),
+                        maxQuota: eventSettings.max_quota ? parseInt(eventSettings.max_quota) : 100
                     },
-                    files: filesToSync
+                    files: {
+                        paymentProof: {
+                            url: fileUrls.paymentProof,
+                            filename: `payment_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.paymentProof?.name.split('.').pop()}`,
+                            type: 'payment'
+                        },
+                        tiktokProof: {
+                            url: fileUrls.tiktokProof,
+                            filename: `tiktok_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.tiktokProof?.name.split('.').pop()}`,
+                            type: 'tiktok'
+                        },
+                        instagramProof: {
+                            url: fileUrls.instagramProof,
+                            filename: `instagram_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.instagramProof?.name.split('.').pop()}`,
+                            type: 'instagram'
+                        }
+                    }
                 };
-
 
                 const response = await fetch('/api/process-registration', {
                     method: 'POST',
