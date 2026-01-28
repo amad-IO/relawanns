@@ -174,7 +174,7 @@ const StorySection = () => {
                     >
                         <div className="relative">
                             <img
-                                src="/img/6.webp"
+                                src="/img/10.webp"
                                 alt="Our Journey"
                                 className="w-full h-80 object-cover rounded-3xl shadow-soft"
                             />
