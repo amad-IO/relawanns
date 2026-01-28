@@ -352,6 +352,37 @@ const Form = () => {
             // Import Supabase client
             const { supabase } = await import('../lib/supabase');
 
+            // ===== CHECK QUOTA BEFORE PROCESSING =====
+            setStatusMessage('Memeriksa kuota pendaftaran...');
+
+            const { data: eventSettings, error: settingsError } = await supabase
+                .from('event_settings')
+                .select('registration_status, current_registrants, max_quota')
+                .eq('id', 1)
+                .single();
+
+            if (settingsError) {
+                throw new Error('Gagal mengecek status pendaftaran');
+            }
+
+            // Check if registration is closed
+            if (eventSettings.registration_status === 'close') {
+                setIsSubmitting(false);
+                setStatusMessage('');
+                alert('❌ Maaf, pendaftaran sudah ditutup!');
+                return;
+            }
+
+            // Check if quota is full
+            if (eventSettings.current_registrants >= eventSettings.max_quota) {
+                setIsSubmitting(false);
+                setStatusMessage('');
+                alert(`❌ Maaf, kuota pendaftaran sudah penuh! (${eventSettings.current_registrants}/${eventSettings.max_quota})`);
+                return;
+            }
+
+            setStatusMessage('Memproses pendaftaran...');
+
             // Sanitize input data
             const cleanData = {
                 name: sanitizeInput(formData.name),
