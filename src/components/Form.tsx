@@ -355,15 +355,21 @@ const Form = () => {
             // ===== CHECK QUOTA BEFORE PROCESSING =====
             setStatusMessage('Memeriksa kuota pendaftaran...');
 
-            const { data: eventSettings, error: settingsError } = await supabase
+            // Get settings (key-value schema)
+            const { data: settingsRows, error: settingsError } = await supabase
                 .from('event_settings')
-                .select('registration_status, current_registrants, max_quota')
-                .eq('id', 1)
-                .single();
+                .select('key, value')
+                .in('key', ['registration_status', 'current_registrants', 'max_quota']);
 
             if (settingsError) {
                 throw new Error('Gagal mengecek status pendaftaran');
             }
+
+            // Convert to object
+            const eventSettings: Record<string, string> = {};
+            settingsRows?.forEach(row => {
+                eventSettings[row.key] = row.value;
+            });
 
             // Check if registration is closed
             if (eventSettings.registration_status === 'close') {
@@ -374,10 +380,13 @@ const Form = () => {
             }
 
             // Check if quota is full
-            if (eventSettings.current_registrants >= eventSettings.max_quota) {
+            const currentCount = parseInt(eventSettings.current_registrants || '0');
+            const maxQuota = parseInt(eventSettings.max_quota || '100');
+
+            if (currentCount >= maxQuota) {
                 setIsSubmitting(false);
                 setStatusMessage('');
-                alert(`❌ Maaf, kuota pendaftaran sudah penuh! (${eventSettings.current_registrants}/${eventSettings.max_quota})`);
+                alert(`❌ Maaf, kuota pendaftaran sudah penuh! (${currentCount}/${maxQuota})`);
                 return;
             }
 
