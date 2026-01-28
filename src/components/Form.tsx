@@ -458,75 +458,65 @@ const Form = () => {
 
             if (insertError) throw new Error('Gagal menyimpan pendaftaran: ' + insertError.message);
 
-            // Trigger Background Process (Drive, Sheet, Telegram)
+            // Trigger Background Process via Queue (Fast!!)
             try {
-                // Prepare payload with proper structure
-                setStatusMessage('Menyimpan data cadangan...');
+                setStatusMessage('Menyimpan ke antrian background...');
 
-                // Get event details (if available from context)
+                // Get event details
                 const { data: eventData } = await supabase
                     .from('event_settings')
                     .select('key, value')
-                    .in('key', ['event_title', 'event_date', 'max_quota', 'current_registrants']);
+                    .in('key', ['event_title', 'event_date']);
 
                 const eventSettings: Record<string, any> = {};
                 eventData?.forEach(item => {
                     eventSettings[item.key] = item.value;
                 });
 
-                const payload = {
-                    registrationData: {
-                        id: insertData[0].id,
-                        name: cleanData.name,
-                        email: cleanData.email,
-                        phone: cleanData.phone,
-                        age: cleanData.age,
-                        city: cleanData.city,
-                        instagramUsername: cleanData.instagramUsername,
-                        participationHistory: cleanData.participationHistory === 'yes' ? 'Sudah Pernah' : 'Belum Pernah',
-                        vestSize: cleanData.vestSize,
-                        registrationNumber: eventSettings.current_registrants ? parseInt(eventSettings.current_registrants) : 0,
-                        eventTitle: eventSettings.event_title || 'Event Relawanns',
-                        eventDate: eventSettings.event_date || new Date().toLocaleDateString('id-ID'),
-                        maxQuota: eventSettings.max_quota ? parseInt(eventSettings.max_quota) : 100
-                    },
+                // Simplified payload for queue
+                const queuePayload = {
+                    registrationId: insertData[0].id,
                     files: {
                         paymentProof: {
                             url: fileUrls.paymentProof,
-                            filename: `payment_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.paymentProof?.name.split('.').pop()}`,
+                            filename: `payment_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${formData.paymentProof?.name.split('.').pop()}`,
                             type: 'payment'
                         },
                         tiktokProof: {
                             url: fileUrls.tiktokProof,
-                            filename: `tiktok_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.tiktokProof?.name.split('.').pop()}`,
+                            filename: `tiktok_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${formData.tiktokProof?.name.split('.').pop()}`,
                             type: 'tiktok'
                         },
                         instagramProof: {
                             url: fileUrls.instagramProof,
-                            filename: `instagram_${timestamp}_${cleanData.name.replace(/\\s+/g, '_')}.${formData.instagramProof?.name.split('.').pop()}`,
+                            filename: `instagram_${timestamp}_${cleanData.name.replace(/\s+/g, '_')}.${formData.instagramProof?.name.split('.').pop()}`,
                             type: 'instagram'
                         }
-                    }
+                    },
+                    eventTitle: eventSettings.event_title || 'Event Relawanns',
+                    eventDate: eventSettings.event_date || new Date().toISOString().split('T')[0]
                 };
 
-                const response = await fetch('/api/process-registration', {
+                // Call enqueue API (fast response!)
+                const response = await fetch('/api/enqueue-job', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(queuePayload)
                 });
 
                 const result = await response.json();
 
                 if (!response.ok || !result.success) {
-                    console.error('Backend processing failed:', result);
-                    // Don't throw - this is non-critical background task
+                    console.error('Failed to enqueue job:', result);
+                    // Don't throw - data is already in database
                 } else {
-                    console.log('Backend processing successful:', result);
+                    console.log('✅ Job enqueued successfully:', result.jobId);
+                    console.log('📊 Queue stats:', result.queueStats);
                 }
 
             } catch (bgError) {
-                console.error('Background process warning:', bgError);
-                // Non-blocking error
+                console.error('Queue enqueue warning:', bgError);
+                // Non-blocking - data is already saved in database
             }
 
             setIsSubmitted(true);
