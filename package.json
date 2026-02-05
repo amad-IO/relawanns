@@ -68,6 +68,8 @@
         "@types/react-dom": "^19.2.3",
         "@vercel/node": "^5.5.28",
         "@vitejs/plugin-react-swc": "^3.10.2",
+        "dotenv": "^17.2.3",
+        "open": "^11.0.0",
         "sharp": "^0.34.5",
         "vite": "6.3.5"
     },

@@ -45,15 +45,15 @@ const GalleryContent = () => {
         fetchDriveLink();
     }, []);
 
-    const filters = ['Semua', 'Pendidikan', 'Kesehatan', 'Lingkungan', 'Event', 'Sosial'];
+    const filters = ['Semua', 'Pendidikan', 'Kesehatan', 'Lingkungan', 'Event', 'Creativity'];
 
     const images = [
         {
             id: 1,
             url: '/img/3.webp',
-            category: 'Jahit Kebaikan',
-            title: 'Program Beasiswa Anak',
-            description: 'Membuat Tempat Pensil Ceria Bersama Adik',
+            category: 'Event',
+            title: 'Sharing Joy',
+            description: 'DIY Gypsum Painting Creativity with Griya Yatim dan Dhuafa',
             size: 'large'
         },
         {
@@ -67,33 +67,33 @@ const GalleryContent = () => {
         {
             id: 3,
             url: '/img/6.webp',
-            category: 'Sosial',
-            title: 'Sentuhan Manis',
-            description: 'Menghias Donat Untuk Kebaikan',
+            category: 'Creativity',
+            title: 'Hands On Creativity',
+            description: 'Membuat Kreasi Karat Bulu bersama Adik-adik',
             size: 'medium'
         },
         {
             id: 4,
             url: '/img/4.webp',
-            category: 'Edukasi',
-            title: 'Edukasi Lingkungan',
-            description: 'Aksi Nyata: Hari Bumi Bersama Anak-Anak',
+            category: 'Event',
+            title: 'World Disability Day',
+            description: 'Satu Hari berbagi Kasih bersama Adik-adik',
             size: 'small'
         },
         {
             id: 5,
             url: '/img/5.webp',
             category: 'Event',
-            title: 'Merdeka Bersama',
-            description: 'Rayakan Kemerdekaan Lewat Kuas dan Canvas',
+            title: 'Fire Up The Day',
+            description: 'Belajar Jadi Pahlawan Bersama Damkar',
             size: 'large'
         },
         {
             id: 6,
             url: '/img/2.webp',
             category: 'Event',
-            title: 'Picnic Date',
-            description: 'Serunya Menghias Bento dan Naik Perahu Bersama Adik Adik',
+            title: 'Mangrove Bercerita',
+            description: 'Menanam mangrove bersama relawan untuk menjaga pesisir',
             size: 'medium'
         },
         {
@@ -123,7 +123,7 @@ const GalleryContent = () => {
         {
             id: 10,
             url: '/img/10.webp',
-            category: 'Penyemangat',
+            category: 'Event',
             title: 'Berbagi Kebahagiaan',
             description: 'Dukungan dan Harapan Bersama Pasien Kanker',
             size: 'small'
@@ -131,49 +131,49 @@ const GalleryContent = () => {
         {
             id: 11,
             url: '/img/11.webp',
-            category: 'Pendidikan',
-            title: 'Kelas Komputer Gratis',
-            description: 'Pelatihan komputer untuk remaja putus sekolah',
+            category: 'Event',
+            title: 'Melukis',
+            description: 'Lukis Harapan Bersama Relawan Untuk Pejuang',
             size: 'medium'
         },
         {
             id: 12,
             url: '/img/12.webp',
-            category: 'Lingkungan',
-            title: 'Bersih-Bersih Sungai',
-            description: 'Aksi bersih Sungai Ciliwung bersama 200 relawan',
+            category: 'Event',
+            title: '',
+            description: '',
             size: 'small'
         },
         {
             id: 13,
             url: '/img/13.webp',
-            category: 'Bencana',
-            title: 'Rehab Rumah Gempa',
-            description: 'Pembangunan kembali rumah pasca gempa',
+            category: 'Event',
+            title: '',
+            description: '',
             size: 'large'
         },
         {
             id: 14,
             url: '/img/2.webp',
             category: 'Event',
-            title: 'Workshop Relawan',
-            description: 'Pelatihan keterampilan untuk relawan baru',
+            title: '',
+            description: '',
             size: 'medium'
         },
         {
             id: 15,
             url: '/img/15.webp',
-            category: 'Pendidikan',
-            title: 'Donasi Alat Sekolah',
-            description: 'Pembagian tas dan alat tulis untuk siswa',
+            category: 'Event',
+            title: '',
+            description: '',
             size: 'small'
         },
         {
             id: 16,
             url: '/img/16.webp',
-            category: 'Mangrove',
-            title: 'Donor Darah Massal',
-            description: 'Kegiatan donor darah bersama PMI',
+            category: 'Event',
+            title: '',
+            description: '',
             size: 'medium'
         },
         {
@@ -195,9 +195,9 @@ const GalleryContent = () => {
         {
             id: 19,
             url: '/img/12.webp',
-            category: 'Lingkungan',
-            title: 'Clean Up Beach',
-            description: 'Aksi bersih pantai Ancol Jakarta',
+            category: 'Sosial',
+            title: 'Kunjungan Panti Asuhan',
+            description: 'Berbagi kebahagiaan dengan anak-anak panti',
             size: 'small'
         },
         {
@@ -211,9 +211,9 @@ const GalleryContent = () => {
         {
             id: 21,
             url: '/img/21.webp',
-            category: 'Kesehatan',
-            title: 'Vaksinasi Gratis',
-            description: 'Program vaksinasi untuk anak-anak',
+            category: 'Event',
+            title: 'Melukis',
+            description: 'Lukis Harapan Bersama Relawan Untuk Pejuang',
             size: 'small'
         },
     ];
